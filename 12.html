@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第12章 DeepSeekMoE：专家专业化创新 (上)</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第12章 DeepSeekMoE：专家专业化创新（上）</h1>
+            <p class="dek">把「公共知识」与「专用知识」解耦：共享专家、细粒度切分与知识冗余量化，看 DeepSeekMoE 如何把专家专业化从偶然变成必然。</p>
+        </header>
 
         <h2>DeepSeekMoE的三大创新</h2>
 
@@ -73,7 +85,26 @@
             <li><strong>M个路由专家</strong>：每个token只选择其中的一部分（Top-m），负责捕获差异化、专业化的知识。</li>
         </ul>
 
-        <p>这种设计的结果是：共享专家参数被充分利用（每个token都用），路由专家参数专注于差异化知识（避免重复学习公共知识），整体上<strong>参数利用效率大幅提升</strong>。</p>
+        <p>这种设计的结果是：共享专家参数被充分利用（每个token都用），路由专家参数专注于差异化知识（避免重复学习公共知识），整体上<strong>参数利用效率大幅提升</strong>。写成公式，DeepSeekMoE 层的输出由两部分相加：</p>
+
+        <div class="math-equation" role="group" aria-label="DeepSeekMoE 层输出公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="DeepSeekMoE 输出公式，可横向滚动">
+                <math display="block" aria-label="输出 h 等于 i 从 1 到 K 的共享专家 S_i(x) 之和 加上 j 在 Top-m 中的路由专家 g_j 乘 R_j(x) 之和">
+                    <mrow>
+                        <mi>h</mi><mo>=</mo>
+                        <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover>
+                        <msub><mi>S</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                        <mo>+</mo>
+                        <munder><mo>∑</mo><mrow><mi>j</mi><mo>∈</mo><mi>Top-m</mi></mrow></munder>
+                        <msub><mi>g</mi><mi>j</mi></msub><msub><mi>R</mi><mi>j</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="S_i 是第 i 个共享专家"><msub><mi>S</mi><mi>i</mi></msub></math> 为共享专家（对每个 token 都固定激活），
+            <math class="math-inline" aria-label="R_j 是被选中的路由专家"><msub><mi>R</mi><mi>j</mi></msub></math> 为路由专家，
+            <math class="math-inline" aria-label="g_j 是归一化后的路由权重"><msub><mi>g</mi><mi>j</mi></msub></math> 为归一化后的路由权重。</p>
 
         <pre><code># DeepSeekMoE 的前向传播（共享专家 + 路由专家）
 class DeepSeekMoELayer(torch.nn.Module):
@@ -128,6 +159,44 @@ class DeepSeekMoELayer(torch.nn.Module):
         <div class="tip">
             <strong>💡 设计洞见：</strong> 共享专家的引入，本质上是将 MoE 中的"公共知识"和"专用知识"解耦。这个思想在推荐系统的 MMoE（Multi-gate MoE）中也有类似体现——每个任务有自己的门控网络，但共享底层专家。DeepSeekMoE 将这一思想推进了一步：明确划分出"公共"和"专用"两部分专家。
         </div>
+
+        <figure>
+            <svg viewBox="0 0 880 340" role="img" aria-labelledby="fig-dsmoe-title fig-dsmoe-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-dsmoe-title">DeepSeekMoE 的共享专家与路由专家双分支</title>
+                <desc id="fig-dsmoe-desc">输入 x 分两路：上分支经过 K 个共享专家（每个 token 都固定激活，负责公共知识）；下分支经路由器在 M 个路由专家中选择 Top-m 个（高亮）执行，负责差异化知识；两者相加得到输出 h。</desc>
+                <rect x="20" y="140" width="80" height="50" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="170" font-size="14" text-anchor="middle" fill="#7c2d12">输入 x</text>
+                <path d="M102 158 C124 158 124 78 148 78" stroke="#94a3b8" stroke-width="1.8" fill="none"/>
+                <path d="M102 172 C124 172 124 252 148 252" stroke="#94a3b8" stroke-width="1.8" fill="none"/>
+                <rect x="148" y="40" width="320" height="80" rx="14" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="308" y="64" font-size="14" text-anchor="middle" fill="#7c2d12" font-weight="700">共享专家（固定激活）</text>
+                <text x="308" y="86" font-size="12" text-anchor="middle" fill="#9a3412">K 个专家：公共知识，每个 token 都计算</text>
+                <rect x="168" y="92" width="130" height="20" rx="6" fill="#fed7aa" stroke="#d06d4d"/>
+                <rect x="318" y="92" width="130" height="20" rx="6" fill="#fed7aa" stroke="#d06d4d"/>
+                <rect x="148" y="222" width="140" height="60" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="218" y="258" font-size="14" text-anchor="middle" fill="#4c1d95">Router</text>
+                <path d="M290 252 h20" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M314 246 l10 6 -10 6 z" fill="#94a3b8"/>
+                <g font-size="12">
+                    <rect x="324" y="226" width="72" height="52" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="360" y="257" text-anchor="middle" fill="#0f4c4a">R1 ✓</text>
+                    <rect x="404" y="226" width="72" height="52" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="440" y="257" text-anchor="middle" fill="#475569">R2</text>
+                    <rect x="484" y="226" width="72" height="52" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="520" y="257" text-anchor="middle" fill="#475569">R3</text>
+                    <rect x="564" y="226" width="72" height="52" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="600" y="257" text-anchor="middle" fill="#0f4c4a">R4 ✓</text>
+                    <text x="648" y="257" font-size="14" fill="#475569">… M 个</text>
+                </g>
+                <text x="324" y="304" font-size="12" fill="#0f4c4a">路由专家：差异化知识，只激活 Top-m 个</text>
+                <path d="M470 80 C560 80 610 158 700 158" stroke="#d06d4d" stroke-width="1.6" fill="none"/>
+                <path d="M640 252 C676 252 680 178 700 172" stroke="#147f80" stroke-width="1.8" fill="none"/>
+                <rect x="700" y="128" width="160" height="64" rx="12" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="780" y="156" font-size="14" text-anchor="middle" fill="#14532d">输出 h</text>
+                <text x="780" y="176" font-size="12" text-anchor="middle" fill="#166534">= 共享 + 路由</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> DeepSeekMoE 的双分支结构：共享专家（橙，固定激活）捕获公共知识，路由专家（青，Top-m 激活）捕获差异化知识，二者相加。公共知识不再被每个路由专家重复学习，冗余度下降。</figcaption>
+        </figure>
 
         <h2>细粒度专家切分：小而美</h2>
 
@@ -230,6 +299,34 @@ def measure_expert_redundancy(model, dataloader):
 
         <p>DeepSeekMoE的实验结果令人振奋：通过引入共享专家和细粒度切分，专家间的平均输出相似度从~0.65降到了~0.35——知识冗余降低了一半！这意味着DeepSeekMoE的参数利用效率远高于传统MoE。同等总参数量下，DeepSeekMoE能够覆盖更广泛的知识领域，这正是它在各种benchmark上超越GShard和Switch Transformer的根本原因。</p>
 
+        <div class="moe-widget" id="redundancy-demo">
+            <p class="widget-q"><strong>交互：</strong>切换架构，比较专家输出之间的平均余弦相似度（越高说明知识冗余越严重）。</p>
+            <div class="controls" role="group" aria-label="选择架构">
+                <button type="button" data-a="gshard" aria-pressed="true">传统 GShard 风格</button>
+                <button type="button" data-a="dsmoe" aria-pressed="false">DeepSeekMoE（2 共享 + 64 路由）</button>
+            </div>
+            <p class="widget-output" aria-live="polite">传统 GShard 风格：专家间平均余弦相似度 ≈ 0.65，知识冗余高。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('redundancy-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                gshard: '传统 GShard 风格：专家间平均余弦相似度 ≈ 0.65，知识冗余高，参数重复学习。',
+                dsmoe: 'DeepSeekMoE：专家间平均余弦相似度 ≈ 0.35，知识冗余约为前者的一半，参数利用更充分。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-a')];
+                });
+            }
+        })();
+        </script>
+
         <p>我印象最深的是，当看到论文中这张"冗余度对比图"时，我立刻理解了为什么我之前用Mixtral做领域微调时，总是感觉模型"学得不够深"——原来有很大一部分参数被浪费在了重复学习基础特征上。后来我在实践中采用了DeepSeekMoE的"共享+路由"思路，在微调MoE模型时冻结共享专家、只微调路由专家和路由器，效果出奇的好——<strong>领域适配速度提升了3倍，灾难性遗忘也大幅减轻</strong>。这个经验让我确信：理解MoE的知识组织方式是做好MoE应用的前提。</p>
 
         <div class="highlight">
@@ -243,7 +340,18 @@ def measure_expert_redundancy(model, dataloader):
             <a href="index.html">📖 返回目录</a>
             <a href="13.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Dai 等，<em>DeepSeekMoE: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a>（共享专家、细粒度切分）</li>
+                <li>Lepikhin 等，<em>GShard</em>，2021。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a>（对比基线）</li>
+                <li>Fedus 等，<em>Switch Transformers</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a></li>
+            </ol>
+            <p>「2 共享 + 64 路由、Top-6」与「16B 配置」及冗余度分析引自 DeepSeekMoE 论文及仓内 <code>pdfs/06_DeepSeekMoE_2024_Dai.pdf</code>。专家间平均余弦相似度（0.65 / 0.35）与「领域微调提速 3 倍」为<strong>教学示意</strong>（已作简化），具体数值与实验设定以论文为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

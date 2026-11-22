@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第9章 GShard：分布式MoE工程基石</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第9章 GShard：分布式 MoE 工程基石</h1>
+            <p class="dek">自动分片与专家并行如何把 MoE 放到数千卡上：从分区标注到 All-to-All 通信，看工程地基如何建成。</p>
+        </header>
 
         <h2>GShard的使命：让MoE跑在千卡集群上</h2>
 
@@ -170,6 +182,93 @@ output = mtf.gather_and_combine(expert_output, expert_dim)</code></pre>
             <strong>⚠️ 通信成本分析：</strong> All-to-All通信是专家并行中最主要的开销来源。当有 D 个设备参与 All-to-All 时，每个设备需要发送和接收来自其他 D-1 个设备的数据。通信量随设备数线性增长。假设每个 token 的隐藏维度为 d_model，每个设备处理 N/D 个 token，则单次 All-to-All 的数据量为 O(N × d_model)。当 D 很大时（如千卡集群），这个开销不容忽视。
         </div>
 
+        <div class="math-equation" role="group" aria-label="专家并行单次 All-to-All 通信量公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="专家并行通信量公式，可横向滚动">
+                <math display="block" aria-label="每个设备在单次 All-to-All 中发送的元素数约等于 N 乘以 d 乘以 D 减 1 除以 D">
+                    <mrow>
+                        <msub><mi>V</mi><mrow><mi>send</mi></mrow></msub><mo>=</mo>
+                        <mi>N</mi><mo>·</mo><mi>d</mi><mo>·</mo>
+                        <mfrac><mrow><mi>D</mi><mo>−</mo><mn>1</mn></mrow><mi>D</mi></mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="N 是 token 数"><mi>N</mi></math> 为 batch 内 token 数，
+            <math class="math-inline" aria-label="d 是隐藏维度"><mi>d</mi></math> 为隐藏维度，
+            <math class="math-inline" aria-label="D 是设备数"><mi>D</mi></math> 为参与 All-to-All 的设备数；当 <math class="math-inline" aria-label="D"><mi>D</mi></math> 很大时该值趋于 <math class="math-inline" aria-label="N 乘 d"><mi>N</mi><mo>·</mo><mi>d</mi></math>，即每个 token 的表示都要被搬一次。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 350" role="img" aria-labelledby="fig-ep-title fig-ep-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-ep-title">专家并行的分发—计算—回收三阶段</title>
+                <desc id="fig-ep-desc">阶段一分发：各设备的 token 经 All-to-All 按目标专家重排到相应设备；阶段二计算：每个设备只用本地专家做 FFN；阶段三回收：结果再经 All-to-All 送回原设备并按路由权重汇总。</desc>
+                <text x="120" y="30" font-size="15" font-weight="700" fill="#1e1b4b">① 分发（All-to-All）</text>
+                <text x="360" y="30" font-size="15" font-weight="700" fill="#1e1b4b">② 本地专家计算</text>
+                <text x="600" y="30" font-size="15" font-weight="700" fill="#1e1b4b">③ 回收（All-to-All）</text>
+                <g font-size="13">
+                    <rect x="30" y="52" width="200" height="60" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                    <text x="130" y="78" text-anchor="middle" fill="#7c2d12">设备 0 的 token</text>
+                    <text x="130" y="98" text-anchor="middle" fill="#7c2d12">设备 1 的 token</text>
+                    <rect x="270" y="52" width="200" height="60" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                    <text x="370" y="78" text-anchor="middle" fill="#4c1d95">设备 0：专家 E1,E2</text>
+                    <text x="370" y="98" text-anchor="middle" fill="#4c1d95">设备 1：专家 E3,E4</text>
+                    <rect x="510" y="52" width="300" height="60" rx="10" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                    <text x="660" y="78" text-anchor="middle" fill="#14532d">结果送回原设备，乘路由权重</text>
+                    <text x="660" y="98" text-anchor="middle" fill="#14532d">后写入对应 token</text>
+                </g>
+                <g stroke="#94a3b8" stroke-width="1.8" fill="none">
+                    <path d="M232 82 h34"/><path d="M472 82 h34"/>
+                </g>
+                <path d="M264 76 l10 6 -10 6 z" fill="#94a3b8"/>
+                <path d="M504 76 l10 6 -10 6 z" fill="#94a3b8"/>
+                <text x="30" y="160" font-size="13" fill="#475569">每个设备只持有 E/D 个专家；token 会被送到其他设备上的专家：</text>
+                <rect x="30" y="180" width="780" height="40" rx="10" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <text x="420" y="206" font-size="14" text-anchor="middle" fill="#0f4c4a">All-to-All 通信链路（跨设备交换）</text>
+                <g font-size="13">
+                    <rect x="30" y="252" width="370" height="46" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6"/>
+                    <text x="215" y="280" text-anchor="middle" fill="#475569">路由打分（本地、轻量）</text>
+                    <rect x="440" y="252" width="370" height="46" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6"/>
+                    <text x="625" y="280" text-anchor="middle" fill="#475569">反向 All-to-All（梯度同理）</text>
+                </g>
+                <text x="30" y="330" font-size="13" fill="#7c2d12">通信量随设备数 D 线性增长：这是专家并行的主要开销来源</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 专家并行的三个阶段：分发（按目标专家跨设备重排 token）→ 本地专家计算 → 回收（再跨设备送回并加权汇总）。每个设备只持有 E/D 个专家，但每个 token 的表示要跨设备搬一次。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="ep-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 E=256 个专家，切换设备数 D，看每个设备承载多少专家，以及单次 All-to-All 每设备发送量的比例。</p>
+            <div class="controls" role="group" aria-label="选择设备数 D">
+                <button type="button" data-d="8" aria-pressed="false">D=8</button>
+                <button type="button" data-d="32" aria-pressed="true">D=32</button>
+                <button type="button" data-d="128" aria-pressed="false">D=128</button>
+                <button type="button" data-d="256" aria-pressed="false">D=256</button>
+            </div>
+            <p class="widget-output" aria-live="polite">D=32：每设备承载 256/32 = 8 个专家；单次 All-to-All 每设备发送量 ≈ N·d·(31/32) ≈ 0.97·N·d。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('ep-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var E = 256;
+            function render(D) {
+                var per = E / D;
+                var ratio = (D - 1) / D;
+                out.textContent = 'D=' + D + '：每设备承载 ' + E + '/' + D + ' = ' + per + ' 个专家；单次 All-to-All 每设备发送量 ≈ N·d·(' +
+                    (D - 1) + '/' + D + ') ≈ ' + ratio.toFixed(2) + '·N·d。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseInt(this.getAttribute('data-d'), 10));
+                });
+            }
+            render(32);
+        })();
+        </script>
+
         <h2>GShard对后世的工程遗产</h2>
 
         <p>GShard的工程遗产深远而广泛。它不仅仅是"一篇关于分布式训练的论文"，更是一套影响了整个深度学习框架生态的设计哲学。下面我用一张表格总结GShard对后续项目的影响：</p>
@@ -236,7 +335,17 @@ output = mtf.gather_and_combine(expert_output, expert_dim)</code></pre>
             <a href="index.html">📖 返回目录</a>
             <a href="10.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Lepikhin 等，<em>GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding</em>，ICLR 2021。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a></li>
+                <li>Fedus 等，<em>Switch Transformers</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a></li>
+            </ol>
+            <p>GShard 的自动分片、专家并行与 Top-2 组内路由引自 Lepikhin 等原文及仓内 <code>pdfs/03_GShard_2020_Lepikhin.pdf</code>。文中专家并行步骤表与通信量公式为<strong>教学整理/推导（已作简化，忽略数据类型与分组细节）</strong>；「PyTorch 无原生 all-to-all」的调试故事为<strong>教学示意</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

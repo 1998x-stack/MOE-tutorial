@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第11章 Mixtral：开源轻量化MoE标杆</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第11章 Mixtral：开源轻量化 MoE 标杆</h1>
+            <p class="dek">8 专家、Top-2、无辅助损失：Mixtral 如何用极简设计在公开榜单上超越 70B 稠密模型，以及它的推理成本到底省在哪里。</p>
+        </header>
 
         <h2>Mixtral：第一款出圈的开源MoE</h2>
 
@@ -131,6 +143,26 @@
 
         <p>注意"8×7B"这个命名其实有些误导——Mixtral并非8个独立的7B模型拼接而成。每个专家是一个FFN层，其参数量大约是隐藏维度4096×中间维度14336的两倍（Gate + Up/Down），约110M参数。8个专家共约880M参数每层，32层加起来约28B。加上Attention部分（约12B）和embedding（约6.7B），总参约为46.7B。"8×7B"只是一个方便记忆的命名。</p>
 
+        <p>每个专家采用的是 SwiGLU 变体前馈（而非传统 ReLU FFN）。其定义为：</p>
+
+        <div class="math-equation" role="group" aria-label="SwiGLU 前馈公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="SwiGLU 公式，可横向滚动">
+                <math display="block" aria-label="FFN 作用于 x 等于 W_down 乘以 SiLU 作用于 x W_gate 与 x W_up 的逐元素乘积">
+                    <mrow>
+                        <mi>FFN</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo>
+                        <msub><mi>W</mi><mrow><mi>down</mi></mrow></msub>
+                        <mrow><mo stretchy="false">(</mo>
+                            <mi>SiLU</mi><mo stretchy="false">(</mo><mi>x</mi><msub><mi>W</mi><mrow><mi>gate</mi></mrow></msub><mo stretchy="false">)</mo>
+                            <mo>⊙</mo>
+                            <mo stretchy="false">(</mo><mi>x</mi><msub><mi>W</mi><mrow><mi>up</mi></mrow></msub><mo stretchy="false">)</mo>
+                        <mo stretchy="false">)</mo></mrow>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="逐元素乘积"><mo>⊙</mo></math> 为逐元素乘积。MoE 层的输出则是被选中的 Top-2 专家输出的加权和：<math class="math-inline" aria-label="y 等于 i 属于 Top2 的 g_i 乘 E_i(x) 之和"><mi>y</mi><mo>=</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mi>Top2</mi></mrow></munder><msub><mi>g</mi><mi>i</mi></msub><msub><mi>E</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></math>。</p>
+
         <pre><code># Mixtral MoE 层前向传播（极简实现）
 import torch
 import torch.nn.functional as F
@@ -180,6 +212,50 @@ class MixtralMoE(torch.nn.Module):
             <strong>💡 架构亮点：</strong> Mixtral 使用的不是传统 ReLU FFN，而是 SwiGLU 变体。SwiGLU 将 FFN 的单个线性层拆分为 Gate 和 Up 两个分支，通过门控机制增强了非线性表达能力。据 Mistral 团队的报告，SwiGLU 是 Mixtral 能在更少活跃参数下超越 LLaMA-2 70B 的关键因素之一。
         </div>
 
+        <figure>
+            <svg viewBox="0 0 900 330" role="img" aria-labelledby="fig-mixtral-title fig-mixtral-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-mixtral-title">Mixtral 的 8 专家 Top-2 路由结构</title>
+                <desc id="fig-mixtral-desc">每个 token 先经线性路由器得到 8 个专家上的得分，选取得分最高的 2 个专家（高亮）执行 SwiGLU 前馈，再按归一化权重加权求和得到输出。</desc>
+                <rect x="20" y="130" width="80" height="50" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="160" font-size="14" text-anchor="middle" fill="#7c2d12">token x</text>
+                <path d="M102 155 h26" stroke="#94a3b8" stroke-width="1.8"/>
+                <path d="M132 149 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="140" y="120" width="120" height="70" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="200" y="150" font-size="14" text-anchor="middle" fill="#4c1d95">Router</text>
+                <text x="200" y="170" font-size="12" text-anchor="middle" fill="#6d28d9">线性 + softmax</text>
+                <g stroke="#cbd5e1" stroke-width="1.2" fill="none">
+                    <path d="M262 155 C286 155 282 32 300 32"/><path d="M262 155 C286 155 282 70 300 70"/>
+                    <path d="M262 155 C286 155 282 108 300 108"/><path d="M262 155 H300"/>
+                    <path d="M262 155 C286 155 282 198 300 198"/><path d="M262 155 C286 155 282 236 300 236"/>
+                    <path d="M262 155 C286 155 282 274 300 274"/><path d="M262 155 C286 155 282 312 300 312"/>
+                </g>
+                <g font-size="12">
+                    <rect x="300" y="18" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="37" text-anchor="middle" fill="#475569">专家 1</text>
+                    <rect x="300" y="56" width="300" height="28" rx="6" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="450" y="75" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 2 ✓（Top-2）</text>
+                    <rect x="300" y="94" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="113" text-anchor="middle" fill="#475569">专家 3</text>
+                    <rect x="300" y="132" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="151" text-anchor="middle" fill="#475569">专家 4</text>
+                    <rect x="300" y="170" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="189" text-anchor="middle" fill="#475569">专家 5</text>
+                    <rect x="300" y="208" width="300" height="28" rx="6" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="450" y="227" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 6 ✓（Top-2）</text>
+                    <rect x="300" y="246" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="265" text-anchor="middle" fill="#475569">专家 7</text>
+                    <rect x="300" y="284" width="300" height="28" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.4"/>
+                    <text x="450" y="303" text-anchor="middle" fill="#475569">专家 8</text>
+                </g>
+                <rect x="660" y="120" width="220" height="70" rx="12" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="770" y="150" font-size="14" text-anchor="middle" fill="#14532d">Top-2 加权求和</text>
+                <text x="770" y="170" font-size="12" text-anchor="middle" fill="#166534">权重重新归一化</text>
+                <path d="M604 70 C636 70 636 155 656 155" stroke="#147f80" stroke-width="2" fill="none"/>
+                <path d="M604 222 C636 222 636 155 656 155" stroke="#147f80" stroke-width="2" fill="none"/>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> Mixtral 的 MoE 层：8 个 SwiGLU 专家中每个 token 只走 2 个（高亮），权重在两个专家上重新归一化。总参 46.7B、每 token 活跃 12.9B，正是这张图带来的稀疏性。</figcaption>
+        </figure>
+
         <h2>不用辅助损失也能负载均衡？</h2>
 
         <p>这是Mixtral最令人惊讶的设计选择之一。在它之前，几乎所有的MoE模型都依赖某种形式的<strong>辅助负载均衡损失</strong>来防止路由坍塌。但Mixtral完全没有使用任何辅助损失！这怎么可能？</p>
@@ -189,6 +265,8 @@ class MixtralMoE(torch.nn.Module):
         <p><strong>1. 自然负载均衡</strong>：Mixtral的8个专家、Top-2路由的设置似乎恰好处于一个"甜蜜点"。在训练过程中，Mixtral的专家之间呈现了自然的负载均衡——不需要任何额外的激励。这可能是因为8个专家的数量不多，Top-2路由允许每个token选择两个专家，覆盖了足够多的路由组合，使得统计上不会出现严重的负载不均。</p>
 
         <p><strong>2. 路由器Bias项</strong>：虽然不是传统的辅助损失，但Mixtral在路由器中引入了一个<strong>可学习的bias向量</strong>（每个专家一个标量）。在训练过程中，如果某个专家长期负载过低，路由器会通过梯度下降自动调整其bias，使其更容易被选中。这是一种比辅助损失更轻量、更优雅的负载均衡机制。</p>
+
+        <div class="note-teaching"><strong>待考/教学示意：</strong> 官方博客与论文并未公开描述一个显式的「可学习 bias 负载均衡」模块；这里的 bias 机制是一种常见解释性说法，用于说明「无辅助损失也能均衡」的可能来源。实际路由细节请以 Mistral 官方发布为准。</div>
 
         <pre><code># Mixtral 的路由器实现（包含负载均衡 bias）
 class MixtralRouter(torch.nn.Module):
@@ -217,6 +295,34 @@ class MixtralRouter(torch.nn.Module):
         <div class="warning">
             <strong>⚠️ 重要提醒：</strong> 不要盲目模仿 Mixtral "无辅助损失" 的做法。Mixtral 能够做到负载自动均衡，与其 8 专家 + Top-2 的路由配置、高质量的训练数据和精细的调参密切相关。如果你将专家数量扩展到 64 或 256，或者采用 Top-1 路由，几乎肯定会出现严重的负载不均。在复现时，建议先从带辅助损失的方案入手，再根据实际监控数据决定是否去掉。
         </div>
+
+        <div class="moe-widget" id="cost-demo">
+            <p class="widget-q"><strong>交互：</strong>在同一硬件上切换对比对象，看 Mixtral 8×7B（MoE）与 LLaMA-2 70B（稠密）的活跃参数与单 token 计算量差异。</p>
+            <div class="controls" role="group" aria-label="选择对比模型">
+                <button type="button" data-m="mixtral" aria-pressed="true">Mixtral 8×7B</button>
+                <button type="button" data-m="llama" aria-pressed="false">LLaMA-2 70B</button>
+            </div>
+            <p class="widget-output" aria-live="polite">Mixtral 8×7B：总参 46.7B，每 token 活跃 12.9B（约 26B FLOPs/token），MMLU 70.6%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('cost-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                mixtral: 'Mixtral 8×7B：总参 46.7B，每 token 活跃 12.9B（约 26B FLOPs/token），MMLU 70.6%。',
+                llama: 'LLaMA-2 70B：总参 69B，每 token 活跃 69B（约 138B FLOPs/token），MMLU 68.9%。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-m')];
+                });
+            }
+        })();
+        </script>
 
         <h2>推理成本分析：MoE vs 稠密模型</h2>
 
@@ -288,7 +394,17 @@ class MixtralRouter(torch.nn.Module):
             <a href="index.html">📖 返回目录</a>
             <a href="12.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（8 专家 Top-2、SwiGLU、无辅助损失）</li>
+                <li>Touvron 等，<em>Llama 2: Open Foundation and Fine-Tuned Chat Models</em>，2023。<a href="https://arxiv.org/abs/2307.09288">arXiv:2307.09288</a>（对比基线与 70B 配置）</li>
+            </ol>
+            <p>参数配置与 MMLU 对比取自 Mixtral 论文/模型卡及仓内 <code>pdfs/05_Mixtral_of_Experts_2024_Jiang.pdf</code>。表中「单 token FLOPs」「显存」「tokens/s」为<strong>教学估算（已作简化）</strong>，随硬件与精度而异；「路由器 bias」为<strong>解释性说法（待考）</strong>，官方未明确说明。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

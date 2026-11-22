@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第10章 专家并行与通信优化</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第10章 专家并行与通信优化</h1>
+            <p class="dek">四种并行如何正交组合，All-to-All 为何成为 MoE 的通信命脉，以及拓扑感知的专家放置为何能拿回 50% 的 GPU 利用率。</p>
+        </header>
 
         <h2>分布式训练的四种并行</h2>
 
@@ -118,6 +130,62 @@ def train_step(batch, model, mesh):
     # All-Reduce 同步梯度
     all_reduce_gradients(dp_group)</code></pre>
 
+        <figure>
+            <svg viewBox="0 0 840 430" role="img" aria-labelledby="fig-par-title fig-par-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-par-title">四种并行方式及其通信原语</title>
+                <desc id="fig-par-desc">四个面板：数据并行切分 batch、用 All-Reduce 同步梯度；张量并行切分隐藏维、用 All-Reduce/Reduce-Scatter；流水线并行按层切分、用 P2P；专家并行按专家切分、用 All-to-All。四者正交，可叠加使用。</desc>
+                <g stroke-width="2">
+                    <rect x="20" y="20" width="390" height="180" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                    <rect x="430" y="20" width="390" height="180" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                    <rect x="20" y="230" width="390" height="180" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                    <rect x="430" y="230" width="390" height="180" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                </g>
+                <g font-size="14" font-weight="700" fill="#1e1b4b">
+                    <text x="40" y="46">① 数据并行（DP）</text>
+                    <text x="450" y="46">② 张量并行（TP）</text>
+                    <text x="40" y="256">③ 流水线并行（PP）</text>
+                    <text x="450" y="256">④ 专家并行（EP）</text>
+                </g>
+                <g font-size="12">
+                    <rect x="40" y="70" width="100" height="46" rx="8" fill="#eef2ff" stroke="#7461ba" stroke-width="1.6"/>
+                    <text x="90" y="98" text-anchor="middle" fill="#3730a3">batch 片 A</text>
+                    <rect x="155" y="70" width="100" height="46" rx="8" fill="#eef2ff" stroke="#7461ba" stroke-width="1.6"/>
+                    <text x="205" y="98" text-anchor="middle" fill="#3730a3">batch 片 B</text>
+                    <rect x="270" y="70" width="100" height="46" rx="8" fill="#eef2ff" stroke="#7461ba" stroke-width="1.6"/>
+                    <text x="320" y="98" text-anchor="middle" fill="#3730a3">batch 片 C</text>
+                    <text x="40" y="150" fill="#475569">按 batch 维切分 → 每卡跑不同数据</text>
+                    <text x="40" y="176" fill="#0f4c4a">通信：All-Reduce（梯度）</text>
+                    <rect x="450" y="70" width="100" height="46" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+                    <text x="500" y="98" text-anchor="middle" fill="#4c1d95">隐藏片 1</text>
+                    <rect x="565" y="70" width="100" height="46" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+                    <text x="615" y="98" text-anchor="middle" fill="#4c1d95">隐藏片 2</text>
+                    <rect x="680" y="70" width="100" height="46" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+                    <text x="730" y="98" text-anchor="middle" fill="#4c1d95">隐藏片 3</text>
+                    <text x="450" y="150" fill="#475569">按隐藏/头维切分 → 大层分到多卡</text>
+                    <text x="450" y="176" fill="#0f4c4a">通信：All-Reduce / Reduce-Scatter</text>
+                    <rect x="40" y="280" width="100" height="46" rx="8" fill="#fff7ed" stroke="#d06d4d" stroke-width="1.6"/>
+                    <text x="90" y="308" text-anchor="middle" fill="#7c2d12">层 1</text>
+                    <rect x="155" y="280" width="100" height="46" rx="8" fill="#fff7ed" stroke="#d06d4d" stroke-width="1.6"/>
+                    <text x="205" y="308" text-anchor="middle" fill="#7c2d12">层 2</text>
+                    <rect x="270" y="280" width="100" height="46" rx="8" fill="#fff7ed" stroke="#d06d4d" stroke-width="1.6"/>
+                    <text x="320" y="308" text-anchor="middle" fill="#7c2d12">层 3</text>
+                    <text x="40" y="360" fill="#475569">按层切分 → 微批次流水</text>
+                    <text x="40" y="386" fill="#0f4c4a">通信：P2P（点对点）</text>
+                    <rect x="450" y="280" width="70" height="46" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="1.6"/>
+                    <text x="485" y="308" text-anchor="middle" fill="#0f4c4a">E1</text>
+                    <rect x="530" y="280" width="70" height="46" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="1.6"/>
+                    <text x="565" y="308" text-anchor="middle" fill="#0f4c4a">E2</text>
+                    <rect x="610" y="280" width="70" height="46" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="1.6"/>
+                    <text x="645" y="308" text-anchor="middle" fill="#0f4c4a">E3</text>
+                    <rect x="690" y="280" width="90" height="46" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="1.6"/>
+                    <text x="735" y="308" text-anchor="middle" fill="#0f4c4a">E4</text>
+                    <text x="450" y="360" fill="#475569">按专家维切分 → MoE 特有维度</text>
+                    <text x="450" y="386" fill="#0f4c4a">通信：All-to-All</text>
+                </g>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 四种并行彼此正交：DP 切 batch、TP 切隐藏维、PP 切层、EP 切专家。通信原语也各不相同，其中只有 EP 使用 All-to-All——它也是 MoE 训练的主要瓶颈来源。</figcaption>
+        </figure>
+
         <h2>All-to-All通信：MoE的通信命脉</h2>
 
         <p>在专家并行中，All-to-All通信是无可替代的核心原语。如果你对它的性能特征理解不够深入，整个训练效率都可能受到影响。</p>
@@ -126,7 +194,16 @@ def train_step(batch, model, mesh):
 
         <p>All-to-All的时间开销可以用下面的公式近似估算：</p>
 
-        <p style="text-align:center; font-size:1.1em; margin:15px 0;"><code>T_alltoall = α × D + β × (D-1) × S / B</code></p>
+        <div class="math-equation" role="group" aria-label="All-to-All 时间开销公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="All-to-All 时间公式，可横向滚动">
+                <math display="block" aria-label="All-to-All 时间约等于 alpha 乘 D 加上 beta 乘 D 减 1 乘 S 除以 B">
+                    <mrow>
+                        <mi>T</mi><mo>=</mo><mi>α</mi><mi>D</mi><mo>+</mo><mi>β</mi>
+                        <mfrac><mrow><mo stretchy="false">(</mo><mi>D</mi><mo>−</mo><mn>1</mn><mo stretchy="false">)</mo><mi>S</mi></mrow><mi>B</mi></mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
 
         <p>其中α是通信延迟，β是每字节传输时间，D是设备数，S是每个设备发送给每个其他设备的数据量（字节数），B是网络带宽。可以看出，All-to-All的延迟与设备数线性增长——这就是为什么当集群规模扩大到数百甚至数千个设备时，通信会成为瓶颈。</p>
 
@@ -188,6 +265,34 @@ def train_step(batch, model, mesh):
             <strong>💡 工程建议：</strong> 对于中小规模的 MoE 训练（8-32 卡），均匀随机放置通常就足够好了。对于大规模训练（64 卡以上），特别是跨节点训练时，强烈建议使用拓扑感知放置：将经常同时被路由的专家对放在同一节点内（利用 NVLink），将跨节点通信量最小化。很多框架（如 Tutel、DeepSpeed）已经内置了这个功能，不需要自己实现。
         </div>
 
+        <div class="moe-widget" id="topo-demo">
+            <p class="widget-q"><strong>交互：</strong>同一套 64 卡集群、相同专家数，切换专家放置策略，看跨节点通信占比与 GPU 利用率的变化。</p>
+            <div class="controls" role="group" aria-label="选择专家放置策略">
+                <button type="button" data-p="random" aria-pressed="true">均匀随机放置</button>
+                <button type="button" data-p="topo" aria-pressed="false">拓扑感知放置</button>
+            </div>
+            <p class="widget-output" aria-live="polite">均匀随机放置：约 40% 通信跨节点，GPU 利用率约 30%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('topo-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                random: '均匀随机放置：约 40% 通信跨节点，GPU 利用率约 30%。',
+                topo: '拓扑感知放置：把常共现的专家对放同节点后，跨节点通信降至约 12%，GPU 利用率升至约 82%。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-p')];
+                });
+            }
+        })();
+        </script>
+
         <h2>通信瓶颈实战分析与优化</h2>
 
         <p>说了这么多理论，我们来分析一个真实的通信瓶颈案例。假设你在训练一个包含64个专家的MoE模型，使用8台8卡A100节点（共64张GPU），每张卡负责1个专家。每个token的隐藏维度d_model=4096，batch size=512，seq_len=2048。</p>
@@ -211,7 +316,18 @@ def train_step(batch, model, mesh):
             <a href="index.html">📖 返回目录</a>
             <a href="11.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Lepikhin 等，<em>GShard</em>，ICLR 2021。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a>（专家并行、All-to-All）</li>
+                <li>Shoeybi 等，<em>Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism</em>，2019。<a href="https://arxiv.org/abs/1909.08053">arXiv:1909.08053</a>（TP/PP）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（3D 并行 + EP 组合）</li>
+            </ol>
+            <p>四种并行的切分维度与通信原语、All-to-All 时间模型为<strong>教学整理/近似（已作简化）</strong>；通信量估算（32GB、4MB、7µs/320µs）、「40%→12% 跨节点、利用率 30%→82%」等数字均为<strong>教学示意</strong>，用于展示量级与优化方向，不代表实测结果。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
