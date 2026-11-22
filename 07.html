@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第7章 负载均衡理论与方法</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第7章 负载均衡理论与方法</h1>
+            <p class="dek">门控为什么总是偏心？从「非对称反馈」出发，推导辅助损失、容量因子与专家坍缩防治的工具体系。</p>
+        </header>
 
         <h2>负载均衡：一个看似简单实则致命的问题</h2>
 
@@ -112,6 +124,23 @@ scores, history = simulate_expert_collapse()
         <p>辅助损失（Auxiliary Loss）是目前最主流的负载均衡手段。我们在第四章中已经介绍了它的基本形式，这一节我们从数学上深入理解它的工作原理。</p>
 
         <p>负载均衡辅助损失的目标是鼓励门控网络在batch内均匀分配token给各个专家。它的通用形式是：</p>
+
+        <div class="math-equation" role="group" aria-label="负载均衡辅助损失公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="辅助损失公式，可横向滚动">
+                <math display="block" aria-label="辅助损失 L_aux 等于专家数 E 乘以 j 从 1 到 E 的重要度 importance_j 与权重 weight_j 乘积之和">
+                    <mrow>
+                        <msub><mi>L</mi><mrow><mi>aux</mi></mrow></msub><mo>=</mo>
+                        <mi>E</mi><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>E</mi></munderover>
+                        <msub><mi>importance</mi><mi>j</mi></msub><mo>·</mo><msub><mi>weight</mi><mi>j</mi></msub>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="importance_j 是专家 j 被选中的频率"><msub><mi>importance</mi><mi>j</mi></msub></math>
+            是专家 <math class="math-inline" aria-label="j"><mi>j</mi></math> 在一个 batch 内被选中的频率，
+            <math class="math-inline" aria-label="weight_j 是门控分配给专家 j 的平均权重"><msub><mi>weight</mi><mi>j</mi></msub></math>
+            是门控分配给它的平均权重。当两者都是均匀分布 <math class="math-inline" aria-label="1 除以 E"><mn>1</mn><mo>/</mo><mi>E</mi></math> 时损失取最小值 1。</p>
 
         <pre><code># 负载均衡辅助损失的数学定义
 def load_balancing_loss(gate_output, tokens_per_expert, num_experts):
@@ -272,6 +301,40 @@ def capacity_factor_analysis(drop_rate_threshold=0.01):
             <strong>⚠️ 常见误区：</strong> 很多初学者把容量因子设得很大（如C=2.0以上），认为"反正多留点空间总不会错"。这是个严重的误解。容量因子大确实降低了token丢弃率，但带来了两个代价：一是<strong>显存浪费</strong>——每个专家的计算张量变得更大；二是<strong>计算效率下降</strong>——大片的padding导致GPU利用率降低。更微妙的是，过大的容量因子会让负载均衡辅助损失"失效"——因为即使路由不均衡，容量也足够容纳所有token，辅助损失的梯度信号减弱。所以容量因子和辅助损失的系数需要协同调节，而不是孤立地调。
         </div>
 
+        <div class="moe-widget" id="cf-demo">
+            <p class="widget-q"><strong>交互：</strong>E=8、k=2、N=1024（基准负载 256 tokens/专家），切换容量因子 C，看容量上限与理论计算效率（其余为 padding 浪费）。</p>
+            <div class="controls" role="group" aria-label="选择容量因子">
+                <button type="button" data-c="1" aria-pressed="false">C = 1.0</button>
+                <button type="button" data-c="1.25" aria-pressed="true">C = 1.25</button>
+                <button type="button" data-c="1.5" aria-pressed="false">C = 1.5</button>
+                <button type="button" data-c="2" aria-pressed="false">C = 2.0</button>
+            </div>
+            <p class="widget-output" aria-live="polite">C=1.25：每专家容量 = ⌈1.25 × 2 × 1024 / 8⌉ = 320 tokens；基准负载 256，理论计算效率 80.0%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('cf-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var E = 8, k = 2, N = 1024, base = k * N / E;
+            function render(c) {
+                var cap = Math.ceil(c * k * N / E);
+                var eff = base / cap * 100;
+                out.textContent = 'C=' + c + '：每专家容量 = ⌈' + c + ' × ' + k + ' × ' + N + ' / ' + E + '⌉ = ' + cap +
+                    ' tokens；基准负载 ' + base.toFixed(0) + '，理论计算效率 ' + eff.toFixed(1) + '%。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseFloat(this.getAttribute('data-c')));
+                });
+            }
+            render(1.25);
+        })();
+        </script>
+
         <h2>专家坍缩：MoE训练的噩梦</h2>
 
         <p><strong>专家坍缩</strong>（Expert Collapse / Expert Collapsing）是MoE训练中最具破坏性的问题。当它发生时，一部分专家"死"了——它们的参数从未被有效更新，永远停留在初始化的随机值附近，对模型的贡献为零。</p>
@@ -293,6 +356,38 @@ def capacity_factor_analysis(drop_rate_threshold=0.01):
             <li><strong>门控自强化</strong>：门控网络在训练中"看到"的样本来自那些被选中的专家，因此它越来越擅长识别那些"已经擅长"的专家。对其他专家的匹配能力永远不会被训练。</li>
             <li><strong>耦合效应</strong>：即使在训练初期所有专家的参数都很类似（都是随机初始化），微小的随机差异也会被正反馈放大——某个专家因为一次偶然的高分获得了更多训练，然后变得更强，导致它下一次更有可能被选中。</li>
         </ul>
+
+        <figure>
+            <svg viewBox="0 0 820 330" role="img" aria-labelledby="fig-balance-title fig-balance-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-balance-title">理想均衡与专家坍缩下的专家负载对比</title>
+                <desc id="fig-balance-desc">左侧柱状图表示理想均衡：8 个专家的 token 占比几乎相等。右侧柱状图表示发生坍缩：两个热门专家承载了大部分 token，其余专家的柱几乎贴地。</desc>
+                <text x="60" y="34" font-size="15" font-weight="700" fill="#4c1d95">理想：负载均衡</text>
+                <text x="460" y="34" font-size="15" font-weight="700" fill="#b91c1c">实际：专家坍缩</text>
+                <line x1="60" y1="280" x2="300" y2="280" stroke="#94a3b8" stroke-width="1.5"/>
+                <line x1="460" y1="280" x2="700" y2="280" stroke="#94a3b8" stroke-width="1.5"/>
+                <g fill="#7c3aed">
+                    <rect x="62" y="120" width="18" height="160"/><rect x="92" y="120" width="18" height="160"/>
+                    <rect x="122" y="120" width="18" height="160"/><rect x="152" y="120" width="18" height="160"/>
+                    <rect x="182" y="120" width="18" height="160"/><rect x="212" y="120" width="18" height="160"/>
+                    <rect x="242" y="120" width="18" height="160"/><rect x="272" y="120" width="18" height="160"/>
+                </g>
+                <g>
+                    <rect x="462" y="110" width="18" height="170" fill="#dc2626"/><rect x="492" y="140" width="18" height="140" fill="#dc2626"/>
+                    <rect x="522" y="240" width="18" height="40" fill="#cbd5e1"/><rect x="552" y="256" width="18" height="24" fill="#cbd5e1"/>
+                    <rect x="582" y="264" width="18" height="16" fill="#cbd5e1"/><rect x="612" y="270" width="18" height="10" fill="#cbd5e1"/>
+                    <rect x="642" y="274" width="18" height="6" fill="#cbd5e1"/><rect x="672" y="276" width="18" height="4" fill="#cbd5e1"/>
+                </g>
+                <g font-size="12" fill="#475569" text-anchor="middle">
+                    <text x="71" y="298">E1</text><text x="101" y="298">E2</text><text x="131" y="298">E3</text><text x="161" y="298">E4</text>
+                    <text x="191" y="298">E5</text><text x="221" y="298">E6</text><text x="251" y="298">E7</text><text x="281" y="298">E8</text>
+                    <text x="471" y="298">E1</text><text x="501" y="298">E2</text><text x="531" y="298">E3</text><text x="561" y="298">E4</text>
+                    <text x="591" y="298">E5</text><text x="621" y="298">E6</text><text x="651" y="298">E7</text><text x="681" y="298">E8</text>
+                </g>
+                <text x="60" y="100" font-size="12" fill="#6d28d9">各约 12.5%</text>
+                <text x="462" y="100" font-size="12" fill="#b91c1c">两个专家过半，其余近乎闲置</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 理想状态下 8 个专家均分 token；一旦正反馈启动，热门专家会被持续强化，冷门专家的柱几乎贴地。（柱高为教学示意，非实测分布）</figcaption>
+        </figure>
 
         <table>
             <thead>
@@ -364,7 +459,18 @@ def capacity_factor_analysis(drop_rate_threshold=0.01):
             <a href="index.html">📖 返回目录</a>
             <a href="08.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（重要度-权重辅助损失）</li>
+                <li>Fedus 等，<em>Switch Transformers</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a>（CV 形式负载损失）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（z-loss / 无辅助损失均衡）</li>
+            </ol>
+            <p>辅助损失的三种写法与防治手段对照表为<strong>教学整理</strong>（已作简化）；文中代码的模拟值、CV 阈值（0.1/0.5/0.8）与「三七法则」均为<strong>教学示意/经验总结</strong>，不代表论文实测结论。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

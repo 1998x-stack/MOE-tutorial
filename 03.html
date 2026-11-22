@@ -401,7 +401,7 @@ FLOPs每token ≈ k × 4 × d × d_ff  # 只计算k个专家的前向传播
             <ol>
                 <li>Bengio, Léonard, Courville，<em>Estimating or Propagating Gradients Through Stochastic Neurons for Conditional Computation</em>，2013。<a href="https://arxiv.org/abs/1306.2795">arXiv:1306.2795</a></li>
                 <li>Jacobs, Jordan, Hinton 等，<em>Adaptive Mixture of Local Experts</em>，Neural Computation，1991。<a href="https://doi.org/10.1162/neco.1991.3.1.79">doi:10.1162/neco.1991.3.1.79</a></li>
-                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022。<a href="https://arxiv.org/abs/2202.09368">arXiv:2202.09368</a></li>
+                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022（见仓内 <code>pdfs/11_Review_Sparse_Expert_Models_2022_Fedus.pdf</code>）。</li>
             </ol>
             <p>本章的 FLOPs 与参数量换算式子可由 <math class="math-inline" aria-label="4 乘以 d 乘以 d_ff"><mn>4</mn><mi>d</mi><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub></math> 直接验算（已作简化，忽略偏置与激活函数）。文中「人脑仅 1–4% 神经元同时活跃」为<strong>教学示意</strong>，用于类比「大储备、局部激活」，并非本节引文中的定量结论；「64 专家稠密训练慢 50 倍」同属教学示意。</p>
         </section>

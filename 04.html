@@ -406,7 +406,7 @@ def load_balancing_loss(gate_output, top_k_indices, num_experts):
             <ol>
                 <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，ICLR 2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（式 (1)(2)、容量公式见其 §2.1）</li>
                 <li>Lepikhin 等，<em>GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding</em>，2020。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a></li>
-                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022。<a href="https://arxiv.org/abs/2202.09368">arXiv:2202.09368</a></li>
+                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022（见仓内 <code>pdfs/11_Review_Sparse_Expert_Models_2022_Fedus.pdf</code>）。</li>
             </ol>
             <p>“137B 参数”与“C=1.25–1.5”均引自 Shazeer 等原文及仓内 <code>pdfs/02_Sparsely-Gated_MoE_2017_Shazeer.pdf</code>；辅助损失系数区间的推荐表为<strong>教学经验总结</strong>（已作简化），仅用于建立量级直觉。</p>
         </section>

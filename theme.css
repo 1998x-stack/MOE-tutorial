@@ -118,6 +118,8 @@ th {
     background: #f5f3ff; color: #5b21b6; font-weight: 600;
 }
 
+th, td { overflow-wrap: anywhere; }
+
 /* === Callout Boxes === */
 .tip {
     padding: 12px 18px; border-radius: 16px; margin: 15px 0; line-height: 1.7;

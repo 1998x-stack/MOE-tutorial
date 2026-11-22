@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第6章 路由机制全景：Token-Choice vs Expert-Choice</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第6章 路由机制全景：Token-Choice vs Expert-Choice</h1>
+            <p class="dek">同一个路由矩阵，按行取 top-k 还是按列取 top-k，会得到完全不同的负载分布。本章把三大类路由放在一起对比。</p>
+        </header>
 
         <h2>路由：MoE的交通枢纽</h2>
 
@@ -63,6 +74,19 @@
         </ul>
 
         <p>这三类路由方法的哲学完全不同。Token-Choice是"以token为中心"的民主投票，Expert-Choice是"以专家为中心"的精英选拔，确定性路由则是"按规则办事"的计划经济。下面我们逐一深入分析。</p>
+
+        <p>用打分矩阵 <math class="math-inline" aria-label="g 下标 i,j 表示第 i 个 token 与第 j 个专家的匹配得分"><msub><mi>g</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub></math>（行 = token <math class="math-inline" aria-label="i"><mi>i</mi></math>，列 = 专家 <math class="math-inline" aria-label="j"><mi>j</mi></math>）就能看清两者的差别：</p>
+
+        <div class="math-equation" role="group" aria-label="Token-Choice 与 Expert-Choice 的选择方向">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="两类路由的选择方向公式，可横向滚动">
+                <math display="block" aria-label="Token-Choice 对每个 token i 在专家下标 j 上取 top-k；Expert-Choice 对每个专家 j 在 token 下标 i 上取 top-k">
+                    <mtable>
+                        <mtr><mtd><mtext>Token-Choice: </mtext><msub><mi>S</mi><mi>i</mi></msub><mo>=</mo><munder><mi>TopK</mi><mi>j</mi></munder><msub><mi>g</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub></mtd></mtr>
+                        <mtr><mtd><mtext>Expert-Choice: </mtext><msub><mi>T</mi><mi>j</mi></msub><mo>=</mo><munder><mi>TopK</mi><mi>i</mi></munder><msub><mi>g</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub></mtd></mtr>
+                    </mtable>
+                </math>
+            </div>
+        </div>
 
         <table>
             <thead>
@@ -106,6 +130,96 @@
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 选择哪种路由方式，本质上是选择"把困难放在哪里"。Token-Choice把困难放在"让路由学习均衡"上（需要复杂的辅助损失和容量管理），Expert-Choice把困难放在"让专家学会挑选"上（需要额外的排序和选择逻辑），确定性路由则完全放弃了学习的灵活性。没有一种方式在所有场景下都是最优的——关键是对齐你的场景需求。
         </div>
+
+        <figure>
+            <svg viewBox="0 0 860 300" role="img" aria-labelledby="fig-route-title fig-route-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-route-title">Token-Choice 按行选择与 Expert-Choice 按列选择的对比</title>
+                <desc id="fig-route-desc">左侧矩阵行为 token、列为专家，Token-Choice 在每一行内选 top-2（每行恰好 2 个高亮）；右侧同一矩阵，Expert-Choice 在每一列内选 top-2（每列恰好 2 个高亮），因而每个专家负载完全相同。</desc>
+                <text x="70" y="44" font-size="15" font-weight="700" fill="#1e1b4b">Token-Choice：按行取 top-2</text>
+                <text x="560" y="44" font-size="15" font-weight="700" fill="#1e1b4b">Expert-Choice：按列取 top-2</text>
+                <g font-size="13" fill="#475569">
+                    <text x="118" y="72">E1</text><text x="154" y="72">E2</text><text x="190" y="72">E3</text><text x="226" y="72">E4</text>
+                    <text x="52" y="104" text-anchor="end">T1</text><text x="52" y="140" text-anchor="end">T2</text><text x="52" y="176" text-anchor="end">T3</text><text x="52" y="212" text-anchor="end">T4</text>
+                    <text x="608" y="72">E1</text><text x="644" y="72">E2</text><text x="680" y="72">E3</text><text x="716" y="72">E4</text>
+                    <text x="542" y="104" text-anchor="end">T1</text><text x="542" y="140" text-anchor="end">T2</text><text x="542" y="176" text-anchor="end">T3</text><text x="542" y="212" text-anchor="end">T4</text>
+                </g>
+                <g stroke="#cbd5e1" stroke-width="1">
+                    <path d="M106 80 V224 M142 80 V224 M178 80 V224 M214 80 V224 M70 80 H214 M70 116 H214 M70 152 H214 M70 188 H214"/>
+                    <path d="M596 80 V224 M632 80 V224 M668 80 V224 M704 80 V224 M560 80 H704 M560 116 H704 M560 152 H704 M560 188 H704"/>
+                </g>
+                <g fill="#d7f2ef" stroke="#147f80" stroke-width="2">
+                    <rect x="106" y="80" width="36" height="36"/><rect x="142" y="80" width="36" height="36"/>
+                    <rect x="70" y="116" width="36" height="36"/><rect x="178" y="116" width="36" height="36"/>
+                    <rect x="106" y="152" width="36" height="36"/><rect x="178" y="152" width="36" height="36"/>
+                    <rect x="70" y="188" width="36" height="36"/><rect x="142" y="188" width="36" height="36"/>
+                    <rect x="560" y="80" width="36" height="36"/><rect x="632" y="80" width="36" height="36"/>
+                    <rect x="596" y="116" width="36" height="36"/><rect x="632" y="116" width="36" height="36"/>
+                    <rect x="560" y="152" width="36" height="36"/><rect x="668" y="152" width="36" height="36"/>
+                    <rect x="596" y="188" width="36" height="36"/><rect x="668" y="188" width="36" height="36"/>
+                </g>
+                <text x="70" y="260" font-size="13" fill="#0f4c4a">每行 2 个：各专家收到的 token 数不定 → 可能不均</text>
+                <text x="560" y="260" font-size="13" fill="#0f4c4a">每列 2 个：每个专家负载完全相等 → 天然均衡</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 同一张 token×专家 打分矩阵上的两种选择方向。按行取 top-2（Token-Choice）无法控制每列被选中的次数；按列取 top-2（Expert-Choice）则天然保证每个专家收到相同数量的 token，代价是某些行可能一个都没被选中。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="route-demo">
+            <p class="widget-q"><strong>交互：</strong>下面是 6 个 token × 4 个专家的固定打分矩阵（k=2）。切换两种路由，观察每个专家收到的 token 数。</p>
+            <div class="controls" role="group" aria-label="选择路由方向">
+                <button type="button" data-r="token" aria-pressed="true">Token-Choice</button>
+                <button type="button" data-r="expert" aria-pressed="false">Expert-Choice</button>
+            </div>
+            <p class="widget-output" aria-live="polite">Token-Choice：各专家收到的 token 数 = [2, 3, 3, 4]，最大/最小 = 2.0×，不均衡。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('route-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var S = [
+                [0.9, 0.2, 0.1, 0.3],
+                [0.8, 0.7, 0.2, 0.1],
+                [0.1, 0.9, 0.6, 0.2],
+                [0.2, 0.3, 0.8, 0.7],
+                [0.4, 0.5, 0.3, 0.9],
+                [0.3, 0.1, 0.7, 0.8]
+            ];
+            var N = S.length, E = 4, k = 2;
+            function topIdx(arr) {
+                return arr.map(function (v, i) { return [v, i]; }).sort(function (a, b) { return b[0] - a[0]; })
+                    .slice(0, k).map(function (p) { return p[1]; });
+            }
+            function tokenChoice() {
+                var load = [0, 0, 0, 0];
+                for (var i = 0; i < N; i++) topIdx(S[i]).forEach(function (j) { load[j]++; });
+                return load;
+            }
+            function expertChoice() {
+                var load = [0, 0, 0, 0];
+                for (var j = 0; j < E; j++) {
+                    var col = S.map(function (row) { return row[j]; });
+                    topIdx(col).forEach(function (i) { load[j]++; });
+                }
+                return load;
+            }
+            function render(mode) {
+                var load = mode === 'token' ? tokenChoice() : expertChoice();
+                var max = Math.max.apply(null, load), min = Math.min.apply(null, load);
+                out.textContent = (mode === 'token' ? 'Token-Choice' : 'Expert-Choice') + '：各专家收到的 token 数 = [' +
+                    load.join(', ') + ']，最大/最小 = ' + (min === 0 ? '∞' : (max / min).toFixed(1)) + '×，' +
+                    (max === min ? '完全均衡。' : '存在不均衡。');
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(this.getAttribute('data-r'));
+                });
+            }
+            render('token');
+        })();
+        </script>
 
         <h2>Token-Choice路由：Token挑专家</h2>
 
@@ -298,7 +412,18 @@ def expert_choice_routing(scores, tokens, experts, k=2):
             <a href="index.html">📖 返回目录</a>
             <a href="07.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（Token-Choice / Noisy Top-K）</li>
+                <li>Zhou 等，<em>Mixture-of-Experts with Expert Choice Routing</em>，2022（Expert-Choice 的提出）</li>
+                <li>Roller 等，<em>Hash Layers For Large Sparse Models</em>，2021（Hash 路由，见仓内文献索引）</li>
+            </ol>
+            <p>三种路由的分类与代表性工作对照表为<strong>教学整理</strong>（已作简化），具体设计以各原文为准。正文中「用 Hash 路由重分配后性能下降约 15–20%」以及推荐系统的热门/冷门 token 故事均为<strong>教学示意</strong>，非论文实测数据。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
