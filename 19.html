@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第19章 专家专业化与知识聚合的博弈</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第19章 专家专业化与知识聚合的博弈</h1>
+            <p class="dek">专家到底在学什么？用重叠度量化冗余，用 MoE Lens 逐个关闭专家，再讨论剪枝与合并的知识聚合策略。</p>
+        </header>
 
         <h2>专家不是"黑盒工人"</h2>
 
@@ -73,6 +85,62 @@
         <p>说到"分配专家"的故事，我想起2024年在一个推荐系统项目中遇到的真实教训。当时我们的团队设计了一个MoE模型用于广告点击率预测（CTR预估），直觉认为用户的"兴趣偏好"是天然可分簇的——于是把领域专家定义成了"体育达人""美妆博主""科技极客"这样的类别，手工分配了8个专家，每个对应一个领域。结果训练出来后，8个专家的激活模式几乎一模一样！后来分析发现，原因是：<strong>领域的边界在嵌入空间中并不清晰</strong>，而且用户本身就有跨域兴趣，路由器学会的最优策略是"把每个token分配给所有专家"，因为这样的"民主投票"在CTR任务上的loss最低。这个故事的教训是：<strong>不要手工给专家预设语义标签</strong>，让梯度驱动自然分化比任何先验知识都可靠。</p>
 
         <h2>专家重叠度：量化知识冗余</h2>
+
+        <p>给定输入 <math class="math-inline" aria-label="x"><mi>x</mi></math>，专家 <math class="math-inline" aria-label="i"><mi>i</mi></math> 与 <math class="math-inline" aria-label="j"><mi>j</mi></math> 的点态重叠度就是它们输出向量的余弦相似度：</p>
+
+        <div class="math-equation" role="group" aria-label="专家重叠度（余弦相似度）公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="重叠度公式，可横向滚动">
+                <math display="block" aria-label="专家 i 与 j 的重叠度等于它们的输出向量点积除以两者范数的乘积">
+                    <mrow>
+                        <mi>Overlap</mi><mo stretchy="false">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false">)</mo><mo>=</mo>
+                        <mfrac>
+                            <mrow><msub><mi>E</mi><mi>i</mi></msub><mo>·</mo><msub><mi>E</mi><mi>j</mi></msub></mrow>
+                            <mrow><mo>‖</mo><msub><mi>E</mi><mi>i</mi></msub><mo>‖</mo><mo>‖</mo><msub><mi>E</mi><mi>j</mi></msub><mo>‖</mo></mrow>
+                        </mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>越接近 1 说明两个专家越「像」，冗余越高；越接近 0 说明分工越鲜明。把两两重叠度排成矩阵，就得到一张重叠度热力图。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 320" role="img" aria-labelledby="fig-overlap-title fig-overlap-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-overlap-title">选择专家两两重叠度热力图</title>
+                <desc id="fig-overlap-desc">一个 4×4 矩阵展示四个专家两两之间的输出余弦相似度：对角线为 1，非对角线偏高（如 0.62、0.58）说明存在明显的知识冗余，颜色越红表示越相似。</desc>
+                <g font-size="13" fill="#475569">
+                    <text x="150" y="44">E1</text><text x="210" y="44">E2</text><text x="270" y="44">E3</text><text x="330" y="44">E4</text>
+                    <text x="110" y="76" text-anchor="end">E1</text><text x="110" y="126" text-anchor="end">E2</text>
+                    <text x="110" y="176" text-anchor="end">E3</text><text x="110" y="226" text-anchor="end">E4</text>
+                </g>
+                <g font-size="13" text-anchor="middle">
+                    <rect x="130" y="56" width="50" height="40" fill="#dc2626"/><text x="155" y="82" fill="#fff">1.00</text>
+                    <rect x="190" y="56" width="50" height="40" fill="#fca5a5"/><text x="215" y="82" fill="#7f1d1d">0.62</text>
+                    <rect x="250" y="56" width="50" height="40" fill="#fecaca"/><text x="275" y="82" fill="#7f1d1d">0.58</text>
+                    <rect x="310" y="56" width="50" height="40" fill="#dcfce7"/><text x="335" y="82" fill="#14532d">0.40</text>
+                    <rect x="130" y="106" width="50" height="40" fill="#fca5a5"/><text x="155" y="132" fill="#7f1d1d">0.62</text>
+                    <rect x="190" y="106" width="50" height="40" fill="#dc2626"/><text x="215" y="132" fill="#fff">1.00</text>
+                    <rect x="250" y="106" width="50" height="40" fill="#fecaca"/><text x="275" y="132" fill="#7f1d1d">0.55</text>
+                    <rect x="310" y="106" width="50" height="40" fill="#fecaca"/><text x="335" y="132" fill="#7f1d1d">0.45</text>
+                    <rect x="130" y="156" width="50" height="40" fill="#fecaca"/><text x="155" y="182" fill="#7f1d1d">0.58</text>
+                    <rect x="190" y="156" width="50" height="40" fill="#fecaca"/><text x="215" y="182" fill="#7f1d1d">0.55</text>
+                    <rect x="250" y="156" width="50" height="40" fill="#dc2626"/><text x="275" y="182" fill="#fff">1.00</text>
+                    <rect x="310" y="156" width="50" height="40" fill="#fef08a"/><text x="335" y="182" fill="#713f12">0.50</text>
+                    <rect x="130" y="206" width="50" height="40" fill="#dcfce7"/><text x="155" y="232" fill="#14532d">0.40</text>
+                    <rect x="190" y="206" width="50" height="40" fill="#fecaca"/><text x="215" y="232" fill="#7f1d1d">0.45</text>
+                    <rect x="250" y="206" width="50" height="40" fill="#fef08a"/><text x="275" y="232" fill="#713f12">0.50</text>
+                    <rect x="310" y="206" width="50" height="40" fill="#dc2626"/><text x="335" y="232" fill="#fff">1.00</text>
+                </g>
+                <text x="460" y="70" font-size="14" font-weight="700" fill="#1e1b4b">怎么读这张图？</text>
+                <text x="460" y="102" font-size="13" fill="#475569">对角线恒为 1（自己与自己）。</text>
+                <text x="460" y="130" font-size="13" fill="#475569">非对角偏高（红）→ 知识冗余高。</text>
+                <text x="460" y="158" font-size="13" fill="#475569">非对角偏低（绿）→ 分工鲜明。</text>
+                <text x="460" y="196" font-size="13" fill="#7c2d12">热力图数值为教学示意；</text>
+                <text x="460" y="220" font-size="13" fill="#7c2d12">实际值取决于数据与训练阶段。</text>
+                <text x="20" y="300" font-size="12" fill="#475569">实验规律：两个专家被选中的频率越接近，其重叠度往往越高——负载均衡会“抹平”专家多样性。</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 专家重叠度热力图（示意）。负载均衡强制每个专家处理等量 token 后，这些 token 分布趋于相同，重叠度随之上升——效率与多样性之间存在张力。</figcaption>
+        </figure>
 
         <p>既然专家之间存在知识共享（或冗余），我们需要一个量化的度量来回答"专家A和专家B到底有多像"这个问题。这引出一个核心概念：<strong>专家重叠度（Expert Overlap）</strong>。</p>
 
@@ -186,6 +254,36 @@ def compute_expert_overlap(experts, dataloader, k=2):
         </div>
 
         <p>听上去是不是有点沮丧？辛辛苦苦训练了8个专家，结果其中2-3个是"吃闲饭"的。但换个角度想，这恰好说明MoE的鲁棒性——即使部分专家失效，其他专家可以"补位"。这是dense模型不具备的特性。</p>
+
+        <div class="moe-widget" id="lens-demo">
+            <p class="widget-q"><strong>交互：</strong>MoE Lens：逐个“置零”某个专家，看模型性能下降多少，从而判断其重要性。</p>
+            <div class="controls" role="group" aria-label="选择要移除的专家">
+                <button type="button" data-x="keep" aria-pressed="true">全部保留</button>
+                <button type="button" data-x="e3" aria-pressed="false">移除专家 3（冗余）</button>
+                <button type="button" data-x="e5" aria-pressed="false">移除专家 5（关键）</button>
+            </div>
+            <p class="widget-output" aria-live="polite">全部保留：基准性能（相对 100%）。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('lens-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                keep: '全部保留：基准性能（相对 100%）。',
+                e3: '移除专家 3：性能仅变化约 -0.5%，说明其知识可被其他专家补位（冗余专家）。',
+                e5: '移除专家 5：性能下降约 -4.2%，说明它承载了难以替代的关键知识。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-x')];
+                });
+            }
+        })();
+        </script>
 
         <h2>专家剪枝：少即是多</h2>
 
@@ -301,7 +399,18 @@ def merge_experts_by_overlap(experts, overlap_matrix, threshold=0.6):
             <a href="index.html">📖 返回目录</a>
             <a href="20.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Dai 等，<em>DeepSeekMoE</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a>（专家专业化与冗余度）</li>
+                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022 — 见仓内 <code>pdfs/11_Review_Sparse_Expert_Models_2022_Fedus.pdf</code>（专家剪枝/合并综述）</li>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（MoE Lens 分析对象）</li>
+            </ol>
+            <p>重叠度定义、Jaccard 重叠度与 MoE Lens、专家剪枝/合并策略引自相关论文及仓内文献索引。热力图数值、MoE Lens 的性能下降百分比（-0.5% / -4.2%）与「剪枝到 3 个专家失活」的故事均为<strong>教学示意</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

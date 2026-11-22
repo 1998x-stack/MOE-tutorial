@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第20章 路由几何理论与专家耦合</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第20章 路由几何理论与专家耦合</h1>
+            <p class="dek">路由器并不是“猜”专家，而是在隐空间里学习一张 Voronoi 图；过强的负载均衡会扭曲这张图，而无参数的 K-Means 路由提供了另一种可能。</p>
+        </header>
 
         <h2>路由器的"第六感"</h2>
 
@@ -53,6 +65,33 @@
         <p>我想先分享一个让我记忆犹新的故事。2024年冬天，我试图在一个多任务MoE中增加辅助损失来加强负载均衡。效果立竿见影——路由分布从极度倾斜变成了接近均匀。但模型的整体性能反而下降了3%！当时百思不得其解，后来读到了一篇论文才明白：<strong>过强的负载均衡损失扭曲了路由器的几何结构</strong>，把路由器从一个"擅长分配合适专家的分类器"变成了一个"只顾着均匀分配的充气娃娃"。这个教训让我意识到——路由器和专家的关系远不是简单的"分配-执行"，而是一种微妙的、基于梯度对齐的几何耦合。</p>
 
         <h2>路由器如何"看见"专家？</h2>
+
+        <figure>
+            <svg viewBox="0 0 840 330" role="img" aria-labelledby="fig-voronoi-title fig-voronoi-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-voronoi-title">路由决策边界与专家响应区域的对齐与扭曲</title>
+                <desc id="fig-voronoi-desc">左图：路由器的决策边界（Voronoi 图）与四簇数据的分布基本重合，每个簇落在匹配专家的区域里。右图：过强的负载均衡把边界推向一侧，原本属于红色专家的簇被切成两半，部分点落入绿色专家的区域。</desc>
+                <rect x="40" y="60" width="340" height="230" rx="12" fill="#fbfaff" stroke="#c4b5fd"/>
+                <rect x="460" y="60" width="340" height="230" rx="12" fill="#fbfaff" stroke="#c4b5fd"/>
+                <text x="210" y="46" font-size="14" font-weight="700" fill="#4c1d95" text-anchor="middle">对齐：边界 ≈ Voronoi 图</text>
+                <text x="630" y="46" font-size="14" font-weight="700" fill="#b91c1c" text-anchor="middle">扭曲：均衡损失把边界推偏</text>
+                <g stroke="#94a3b8" stroke-width="2.4">
+                    <path d="M215 60 V290"/><path d="M40 170 H380"/>
+                </g>
+                <g fill="#147f80"><circle cx="110" cy="110" r="7"/><circle cx="140" cy="130" r="7"/><circle cx="120" cy="150" r="7"/><circle cx="90" cy="130" r="7"/></g>
+                <g fill="#d06d4d"><circle cx="300" cy="110" r="7"/><circle cx="320" cy="135" r="7"/><circle cx="285" cy="145" r="7"/><circle cx="310" cy="90" r="7"/></g>
+                <g fill="#7c3aed"><circle cx="110" cy="230" r="7"/><circle cx="140" cy="245" r="7"/><circle cx="95" cy="255" r="7"/></g>
+                <g fill="#2b7a4b"><circle cx="300" cy="235" r="7"/><circle cx="325" cy="250" r="7"/><circle cx="290" cy="260" r="7"/></g>
+                <g stroke="#94a3b8" stroke-width="2.4">
+                    <path d="M660 60 V290"/><path d="M460 130 H800"/>
+                </g>
+                <g fill="#d06d4d"><circle cx="520" cy="95" r="7"/><circle cx="540" cy="115" r="7"/><circle cx="725" cy="110" r="7"/><circle cx="745" cy="90" r="7"/></g>
+                <g fill="#2b7a4b"><circle cx="600" cy="250" r="7"/><circle cx="650" cy="260" r="7"/><circle cx="700" cy="245" r="7"/></g>
+                <g fill="#147f80"><circle cx="500" cy="180" r="7"/><circle cx="520" cy="230" r="7"/></g>
+                <g fill="#7c3aed"><circle cx="640" cy="180" r="7"/><circle cx="680" cy="210" r="7"/></g>
+                <text x="40" y="314" font-size="12" fill="#475569">点 = token 表示；颜色 = 真正最适合的专家；线 = 路由器决策边界（教学示意）</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 训练良好时路由边界（Voronoi 图）与专家响应区域几乎重合；过强的负载均衡会为了“均分”把边界推偏，使 token 被送到并不最适合的专家。</figcaption>
+        </figure>
 
         <p>要理解路由器和专家的关系，我们需要一种可视化的"语言"。最直观的方法是把专家的功能区域映射到输入表征空间中，然后看路由器的决策边界是否与这些区域对齐。</p>
 
@@ -105,6 +144,28 @@ def visualize_router_expert_alignment(router, experts, hidden_dim=2):
         </div>
 
         <h2>几何耦合：router和expert的梯度秘密</h2>
+
+        <p>损失对路由参数 <math class="math-inline" aria-label="W_r"><msub><mi>W</mi><mi>r</mi></msub></math> 的梯度中，隐藏着「专家表现」这一关键信号：</p>
+
+        <div class="math-equation" role="group" aria-label="路由参数梯度公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="路由参数梯度公式，可横向滚动">
+                <math display="block" aria-label="L 对 W_r 的梯度等于 i 求和：dL/dy 乘专家输出 E_i(x) 乘 G_i 乘 1 减 G_i，再乘 x 转置">
+                    <mrow>
+                        <mfrac><mrow><mo>∂</mo><mi>L</mi></mrow><mrow><mo>∂</mo><msub><mi>W</mi><mi>r</mi></msub></mrow></mfrac><mo>=</mo>
+                        <munder><mo>∑</mo><mi>i</mi></munder>
+                        <mrow><mo>[</mo>
+                            <mfrac><mrow><mo>∂</mo><mi>L</mi></mrow><mrow><mo>∂</mo><mi>y</mi></mrow></mfrac><mo>·</mo>
+                            <msub><mi>E</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>·</mo>
+                            <msub><mi>G</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                            <mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><msub><mi>G</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo>
+                        <mo>]</mo></mrow>
+                        <msup><mi>x</mi><mo>⊤</mo></msup>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="dL/dy 乘 E_i(x)"><mfrac><mrow><mo>∂</mo><mi>L</mi></mrow><mrow><mo>∂</mo><mi>y</mi></mrow></mfrac><mo>·</mo><msub><mi>E</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></math> 是「该专家输出对降低损失是否有帮」的信号：其方向与梯度一致就抬高门控权重，反之压低——这就是几何耦合的自强化机制。</p>
 
         <p>路由器和专家之间的"默契"不是凭空产生的，它的背后有一个优雅的梯度机制。我们来分析一下反向传播中的关键环节。</p>
 
@@ -182,6 +243,22 @@ def visualize_router_expert_alignment(router, experts, hidden_dim=2):
 
         <h2>负载均衡损失如何破坏几何结构</h2>
 
+        <p>标准的负载均衡损失鼓励每个专家被选中的概率接近均匀：</p>
+
+        <div class="math-equation" role="group" aria-label="平方负载均衡损失">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="负载均衡损失公式，可横向滚动">
+                <math display="block" aria-label="辅助损失 L_aux 等于 alpha 乘 E 乘 i 求和 1 除以 E 减 P_i 的平方">
+                    <mrow>
+                        <msub><mi>L</mi><mrow><mi>aux</mi></mrow></msub><mo>=</mo><mi>α</mi><mo>·</mo><mi>E</mi>
+                        <munder><mo>∑</mo><mi>i</mi></munder>
+                        <msup><mrow><mo stretchy="false">(</mo><mfrac><mn>1</mn><mi>E</mi></mfrac><mo>−</mo><msub><mi>P</mi><mi>i</mi></msub><mo stretchy="false">)</mo></mrow><mn>2</mn></msup>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>它的梯度<strong>与输入内容无关</strong>——不管 token 是什么，它都要求每个专家的选中概率接近 <math class="math-inline" aria-label="1/E"><mn>1</mn><mo>/</mo><mi>E</mi></math>。当它与「内容相关」的主任务梯度冲突时，路由器的 Voronoi 边界就会被扭曲。</p>
+
         <p>上一章我们提到过负载均衡损失（auxiliary loss）对专家多样性的潜在副作用。这里我们从几何耦合的角度进一步剖析这个问题。</p>
 
         <p>标准的负载均衡损失鼓励每个专家被选中的概率接近均匀。写成数学形式：</p>
@@ -206,6 +283,36 @@ def visualize_router_expert_alignment(router, experts, hidden_dim=2):
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> DeepSeek-V3 提出的"无损负载均衡"本质上是在<strong>不破坏路由几何结构</strong>的前提下实现均衡——不是通过辅助损失强制路由器改变分配策略，而是通过动态调整每个专家的"biased"（偏置项）来影响softmax输出。偏置项调整不改变梯度的主方向，因此路由器-专家的几何耦合得以保持完整。这也是为什么DeepSeek-V3能在做到负载均衡的同时不损失模型性能。
         </div>
+
+        <div class="moe-widget" id="alpha-demo">
+            <p class="widget-q"><strong>交互：</strong>固定任务与数据，滑动负载均衡系数 α，观察路由器几何结构的「对齐—扭曲」程度与模型性能。</p>
+            <div class="controls" role="group" aria-label="选择负载均衡系数 α">
+                <button type="button" data-a="0" aria-pressed="false">α = 0</button>
+                <button type="button" data-a="0.01" aria-pressed="true">α = 0.01</button>
+                <button type="button" data-a="0.5" aria-pressed="false">α = 0.5</button>
+            </div>
+            <p class="widget-output" aria-live="polite">α=0.01：边界近似 Voronoi 图，负载与几何基本兼顾，性能损失很小。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('alpha-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                '0': 'α=0：几何完全对齐，但路由可能极度倾斜，专家坍缩风险高。',
+                '0.01': 'α=0.01：边界近似 Voronoi 图，负载与几何基本兼顾，性能损失很小。',
+                '0.5': 'α=0.5：均衡信号压倒任务信号，Voronoi 边界被严重扭曲，性能明显下降（约 -3%）。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-a')];
+                });
+            }
+        })();
+        </script>
 
         <h2>K-Means路由：无参数路由的尝试</h2>
 
@@ -301,7 +408,18 @@ class KMeansRouter(nn.Module):
             <a href="index.html">📖 返回目录</a>
             <a href="21.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（路由与辅助损失）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（无辅助损失均衡）</li>
+                <li>Dai 等，<em>DeepSeekMoE</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a>（专家质心/亲和度）</li>
+            </ol>
+            <p>路由参数梯度与平方负载均衡损失形式、Voronoi 对齐观察为<strong>教学推导/示意（已作简化）</strong>；「α=0.5 时性能 -3%」与 K-Means 路由的实验结论为<strong>教学示意</strong>，具体数值以相关论文为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第17章 多任务MoE：MMoE与任务专属门控</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第17章 多任务 MoE：MMoE 与任务专属门控</h1>
+            <p class="dek">一个模型同时优化 CTR、观看时长与互动率：MMoE 用「共享专家 + 任务专属门控」把任务干扰从参数层面移到选择层面。</p>
+        </header>
 
         <h2>多任务学习为什么需要MoE？</h2>
 
@@ -59,6 +71,62 @@
         </div>
 
         <h2>MMoE架构：每个任务一个门控</h2>
+
+        <p>对第 <math class="math-inline" aria-label="k"><mi>k</mi></math> 个任务，它有自己的门控 <math class="math-inline" aria-label="g 的 k"><msup><mi>g</mi><mi>k</mi></msup></math> 和自己的塔网络，而底层专家共享：</p>
+
+        <div class="math-equation" role="group" aria-label="MMoE 第 k 个任务输出公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="MMoE 输出公式，可横向滚动">
+                <math display="block" aria-label="第 k 个任务的输出 y_k 等于它的塔网络作用于 对所有专家 i 的门控权重 g_i^k 乘专家输出 E_i(x) 之和">
+                    <mrow>
+                        <msub><mi>y</mi><mi>k</mi></msub><mo>=</mo>
+                        <msub><mi>Tower</mi><mi>k</mi></msub>
+                        <mrow><mo stretchy="false">(</mo>
+                            <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover>
+                            <msubsup><mi>g</mi><mi>i</mi><mi>k</mi></msubsup>
+                            <msub><mi>E</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                        <mo stretchy="false">)</mo></mrow>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>任务间唯一的差别就在门控权重上：<math class="math-inline" aria-label="g_i^k 随任务 k 而变"><msubsup><mi>g</mi><mi>i</mi><mi>k</mi></msubsup></math> 随 <math class="math-inline" aria-label="k"><mi>k</mi></math> 而变，而 <math class="math-inline" aria-label="E_i 对所有任务共享"><msub><mi>E</mi><mi>i</mi></msub></math> 对所有任务共享。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 340" role="img" aria-labelledby="fig-mmoe-title fig-mmoe-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-mmoe-title">MMoE 的共享专家与任务专属门控结构</title>
+                <desc id="fig-mmoe-desc">底层是共享的专家集合；CTR 任务与观看时长任务各自拥有一个门控，对同一批专家输出加权后送入各自的塔网络，得到两个任务输出。</desc>
+                <text x="420" y="26" font-size="13" text-anchor="middle" fill="#475569">两个任务共享底层专家，但各自门控/塔不同</text>
+                <rect x="120" y="60" width="180" height="56" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="210" y="94" font-size="14" text-anchor="middle" fill="#3730a3">Tower: CTR</text>
+                <rect x="540" y="60" width="180" height="56" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="630" y="94" font-size="14" text-anchor="middle" fill="#3730a3">Tower: 观看时长</text>
+                <rect x="140" y="150" width="140" height="50" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="210" y="181" font-size="13" text-anchor="middle" fill="#4c1d95">门控·CTR</text>
+                <rect x="560" y="150" width="140" height="50" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="630" y="181" font-size="13" text-anchor="middle" fill="#4c1d95">门控·时长</text>
+                <g stroke="#94a3b8" stroke-width="1.6" fill="none">
+                    <path d="M210 150 V116"/><path d="M630 150 V116"/>
+                </g>
+                <path d="M204 118 l6 -10 6 10 z" fill="#94a3b8"/><path d="M624 118 l6 -10 6 10 z" fill="#94a3b8"/>
+                <line x1="80" y1="240" x2="760" y2="240" stroke="#cbd5e1" stroke-width="2"/>
+                <g stroke="#94a3b8" stroke-width="1.6" fill="none">
+                    <path d="M210 200 V240"/><path d="M630 200 V240"/>
+                </g>
+                <g font-size="13">
+                    <rect x="60" y="252" width="150" height="52" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2"/>
+                    <text x="135" y="284" text-anchor="middle" fill="#0f4c4a">专家 1</text>
+                    <rect x="230" y="252" width="150" height="52" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2"/>
+                    <text x="305" y="284" text-anchor="middle" fill="#0f4c4a">专家 2</text>
+                    <rect x="400" y="252" width="150" height="52" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2"/>
+                    <text x="475" y="284" text-anchor="middle" fill="#0f4c4a">专家 3</text>
+                    <rect x="570" y="252" width="150" height="52" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2"/>
+                    <text x="645" y="284" text-anchor="middle" fill="#0f4c4a">专家 4</text>
+                </g>
+                <text x="70" y="212" font-size="12" fill="#475569">共享专家集合（同一批参数）</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> MMoE：底层专家共享，CTR 与观看时长各自拥有门控和塔。同一批专家被不同门控“重新组装”，任务干扰从参数层面移到了专家选择层面。</figcaption>
+        </figure>
 
         <p>MMoE的架构设计可以用一句话概括：<strong>共享专家 + 任务专属门控</strong>。我们来拆解一下它的结构：</p>
 
@@ -214,6 +282,36 @@ class MMoELayer(nn.Module):
 
         <p>这些数字看起来提升不大，但在推荐系统中，AUC每提升0.1%都可能意味着数百万美元的营收变化。MMoE相比Shared-Bottom的全任务平均提升1.7%，这在工业场景中是一个巨大的收益。</p>
 
+        <div class="moe-widget" id="mmoe-demo">
+            <p class="widget-q"><strong>交互：</strong>切换三种多任务架构，比较门控数量、任务干扰程度与相对基线（Shared-Bottom）的平均 AUC 增益。</p>
+            <div class="controls" role="group" aria-label="选择架构">
+                <button type="button" data-a="shared" aria-pressed="false">Shared-Bottom</button>
+                <button type="button" data-a="omoe" aria-pressed="false">OMoE</button>
+                <button type="button" data-a="mmoe" aria-pressed="true">MMoE</button>
+            </div>
+            <p class="widget-output" aria-live="polite">MMoE：n 个任务 n 个门控，任务干扰最低，全任务平均 AUC 相对 Shared-Bottom 约 +1.7%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('mmoe-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                shared: 'Shared-Bottom：1 个共享底层、无门控，任务干扰最强。',
+                omoe: 'OMoE：共享专家 + 单一全局门控，专家可分化，但仍不区分任务，干扰中等。',
+                mmoe: 'MMoE：n 个任务 n 个门控，任务干扰最低，全任务平均 AUC 相对 Shared-Bottom 约 +1.7%。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-a')];
+                });
+            }
+        })();
+        </script>
+
         <h2>工业实战：Google推荐系统的MMoE</h2>
 
         <p>MMoE不仅仅是一个学术研究，它在Google的推荐系统中被大规模部署并取得了显著效果。让我们一起看看MMoE在YouTube推荐中的实战经验。</p>
@@ -273,7 +371,18 @@ model_config = {
             <a href="index.html">📖 返回目录</a>
             <a href="18.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Ma 等，<em>Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts</em>，KDD 2018。<a href="https://arxiv.org/abs/1806.00035">arXiv:1806.00035</a>（MMoE / OMoE）</li>
+                <li>Tang 等，<em>Progressive Layered Extraction (PLE)</em>，RecSys 2020（MMoE 在工业推荐中的改良）</li>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（MoE 基础）</li>
+            </ol>
+            <p>MMoE/OMoE/Shared-Bottom 的架构对比与 YouTube 推荐验证引自 Ma 等原文及仓内 <code>pdfs/09_MMoE_2018_Ma.pdf</code>。文中 AUC 提升（平均 +1.7%）来自论文表格的<strong>教学引用</strong>；「正交化约束」与「四个任务踩坑」的故事为<strong>教学示意</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

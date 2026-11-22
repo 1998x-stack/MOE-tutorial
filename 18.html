@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第18章 异构MoE与开放MoE生态</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,10 +49,55 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第18章 异构 MoE 与开放 MoE 生态</h1>
+            <p class="dek">DBRX 用异构专家与 Top-4 路由拉开组合空间，OLMoE 把训练与路由日志彻底公开，MegaBlocks 用分组矩阵乘法重写稀疏计算。</p>
+        </header>
 
         <h2>DBRX：不同专家不同大小</h2>
+
+        <p>专家数量的增加之所以能提升表达能力，一个直观的量度是「可选组合数」——从 <math class="math-inline" aria-label="E"><mi>E</mi></math> 个专家里选 <math class="math-inline" aria-label="k"><mi>k</mi></math> 个：</p>
+
+        <div class="math-equation" role="group" aria-label="专家组合数公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="组合数公式，可横向滚动">
+                <math display="block" aria-label="从 E 个专家中选 k 个的组合数等于 E 的阶乘除以 k 的阶乘乘 E 减 k 的阶乘">
+                    <mrow>
+                        <mi>C</mi><mo stretchy="false">(</mo><mi>E</mi><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>=</mo>
+                        <mfrac>
+                            <mrow><mi>E</mi><mo>!</mo></mrow>
+                            <mrow><mi>k</mi><mo>!</mo><mo stretchy="false">(</mo><mi>E</mi><mo>−</mo><mi>k</mi><mo stretchy="false">)!</mo></mrow>
+                        </mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>Mixtral 的 <math class="math-inline" aria-label="C(8,2) 等于 28"><mi>C</mi><mo stretchy="false">(</mo><mn>8</mn><mo>,</mo><mn>2</mn><mo stretchy="false">)</mo><mo>=</mo><mn>28</mn></math>，而 DBRX 的 <math class="math-inline" aria-label="C(16,4) 等于 1820"><mi>C</mi><mo stretchy="false">(</mo><mn>16</mn><mo>,</mo><mn>4</mn><mo stretchy="false">)</mo><mo>=</mo><mn>1820</mn></math>——组合空间大了约 65 倍。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 300" role="img" aria-labelledby="fig-hetero-title fig-hetero-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-hetero-title">同构专家与异构专家的容量对比</title>
+                <desc id="fig-hetero-desc">左侧同构 MoE：每个专家大小完全相同。右侧异构 MoE：专家块大小不一，容量按需分配，小需求专家不再占据与大需求专家相同的参数。</desc>
+                <rect x="20" y="60" width="380" height="200" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <rect x="440" y="60" width="380" height="200" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <text x="210" y="44" font-size="14" font-weight="700" fill="#475569" text-anchor="middle">同构 MoE（如 Mixtral）：容量相同</text>
+                <text x="630" y="44" font-size="14" font-weight="700" fill="#4c1d95" text-anchor="middle">异构 MoE（如 DBRX）：容量按需</text>
+                <g fill="#d7f2ef" stroke="#147f80" stroke-width="2">
+                    <rect x="50" y="90" width="80" height="60"/><rect x="140" y="90" width="80" height="60"/>
+                    <rect x="230" y="90" width="80" height="60"/><rect x="320" y="90" width="50" height="60"/>
+                </g>
+                <g fill="#d7f2ef" stroke="#147f80" stroke-width="2">
+                    <rect x="470" y="80" width="110" height="80"/><rect x="590" y="110" width="70" height="50"/>
+                    <rect x="670" y="130" width="50" height="30"/><rect x="730" y="140" width="40" height="20"/>
+                </g>
+                <text x="50" y="175" font-size="12" fill="#475569">每个专家参数量相等 — 小需求专家也占大容量</text>
+                <text x="470" y="175" font-size="12" fill="#4c1d95">大需求专家更大，小需求专家更小 — 减少浪费</text>
+                <text x="20" y="286" font-size="12" fill="#475569">块面积 = 专家容量（教学示意）；DBRX 的 16 个专家中大小不一，并采用 Top-4 路由</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 同构 vs 异构专家：同构 MoE 给每个专家相同容量，异构 MoE 让容量随需求变化。但异构也带来参数管理、容量统计与并行切分的工程复杂度。</figcaption>
+        </figure>
 
         <p>大家好，我是你们的讲师。2024年3月，Databricks发布了DBRX——一个132B总参数、36B活跃参数的开源MoE模型。在很多方面，DBRX算不上一座"理论丰碑"，它没有提出惊天动地的公式，也没有突破性的训练方法。但DBRX有一件事做得很特别——它证明了<strong>MoE的工程化落地可以有多强</strong>。</p>
 
@@ -131,6 +184,40 @@ def heterogeneous_moe_forward(x, experts, router):
         <div class="tip">
             <strong>💡 工程细节：</strong> DBRX 在训练中采用了多达 12T token 的数据，包含文本和代码，训练成本约 $10M。它的推理速度比同等参数量的 Dense 模型快约 2 倍。值得注意的是，DBRX 完全构建在 Databricks 平台上——从数据管理（Unity Catalog）、数据处理（Apache Spark）到训练和部署，全部使用 Databricks 的工具链。这展现了一种新的可能性：<strong>MoE 模型的构建不再是少数巨头的特权，拥有强大数据平台的团队也可以参与竞争</strong>。
         </div>
+
+        <div class="moe-widget" id="combo-demo">
+            <p class="widget-q"><strong>交互：</strong>切换不同的 (专家数 E, Top-K) 组合，看同一 token 可选的路由组合数如何爆炸式增长。</p>
+            <div class="controls" role="group" aria-label="选择专家数与 Top-K">
+                <button type="button" data-e="8" data-k="2" aria-pressed="true">(E=8, k=2)</button>
+                <button type="button" data-e="16" data-k="4" aria-pressed="false">(E=16, k=4)</button>
+                <button type="button" data-e="64" data-k="8" aria-pressed="false">(E=64, k=8)</button>
+            </div>
+            <p class="widget-output" aria-live="polite">(E=8, k=2)：C(8,2) = 28 种组合。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('combo-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            function choose(n, k) {
+                var r = 1;
+                for (var i = 1; i <= k; i++) r = r * (n - k + i) / i;
+                return Math.round(r);
+            }
+            function render(e, k) {
+                out.textContent = '(E=' + e + ', k=' + k + ')：C(' + e + ',' + k + ') = ' + choose(e, k).toLocaleString('en-US') + ' 种组合。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseInt(this.getAttribute('data-e'), 10), parseInt(this.getAttribute('data-k'), 10));
+                });
+            }
+            render(8, 2);
+        })();
+        </script>
 
         <h2>OLMoE：全开源的学术MoE基线</h2>
 
@@ -364,7 +451,18 @@ def megablocks_moe_forward(x, router, experts):
             <a href="index.html">📖 返回目录</a>
             <a href="19.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Databricks，<em>Introducing DBRX</em>（技术博客与参考）— 见仓内 <code>pdfs/10_DBRX_Databricks_2024_Reference.md</code>（异构专家、Top-4 路由、MegaBlocks）</li>
+                <li>Muennighoff 等，<em>OLMoE: Open Mixture-of-Experts Language Models</em>，2024 — 见仓内 <code>pdfs/12_OLMoE_2024_Muennighoff.pdf</code>（全开放 MoE 基线）</li>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（同构 Top-2 对比）</li>
+            </ol>
+            <p>DBRX/OLMoE/MegaBlocks 的配置与定位引自 Databricks、AI2 公开资料及仓内对应文件。「MegaBlocks 提升 2–3 倍」「组合数 65 倍」等为<strong>教学示意/推导</strong>（组合数可由 <math class="math-inline" aria-label="C(E,k)"><mi>C</mi><mo stretchy="false">(</mo><mi>E</mi><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo></math> 验算），实际加速比随负载而异。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
