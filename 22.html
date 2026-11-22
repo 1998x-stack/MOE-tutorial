@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第22章 专家可解释性与语义发现</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第22章 专家可解释性与语义发现</h1>
+            <p class="dek">打开 MoE 黑箱：单语义专家、从频率到语法的层间梯度，以及用因果干预直接操控模型行为的证据。</p>
+        </header>
 
         <h2>MoE最大的"黑箱"</h2>
 
@@ -55,6 +67,24 @@
         <p>我至今记得2024年底第一次看到专家激活热力图时的震撼。当时我们在分析一个训练好的8专家MoE模型，把每个专家对32K token的激活频率画成热力图——结果看到第6专家几乎只对"的、了、是、在"这些虚词有反应。一个真正的"语法专家"！那一刻我突然意识到，MoE内部可能比我们想象的更有秩序。这一章，我们就来系统探索MoE这座"黑箱"里的秩序。</p>
 
         <h2>单语义专家：一个专家一个概念</h2>
+
+        <p>“单语义”可以用一个可量化的指标衡量——语义纯度：</p>
+
+        <div class="math-equation" role="group" aria-label="语义纯度公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="语义纯度公式，可横向滚动">
+                <math display="block" aria-label="语义纯度等于该专家激活且属于主导类别的 token 数 除以 该专家激活的 token 总数">
+                    <mrow>
+                        <mtext>纯度</mtext><mo>=</mo>
+                        <mfrac>
+                            <mrow><mtext>激活且属于主导类别的 token 数</mtext></mrow>
+                            <mrow><mtext>该专家激活的 token 总数</mtext></mrow>
+                        </mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>纯度接近 1，说明这个专家几乎只在处理同一个语义类别；接近随机水平则说明它没有形成专业分工。</p>
 
         <p>在MoE可解释性研究中，最激动人心的发现莫过于<strong>单语义专家（Single-Semantic Expert）</strong>的存在。所谓单语义专家，指的是在某个MoE层中，一个专家的激活模式高度集中在单一的语义类别上——比如"所有包含数字的token"、"所有代词"、"所有数学运算符"。</p>
 
@@ -125,6 +155,29 @@
         </div>
 
         <h2>频率到语法的梯度：层间分工</h2>
+
+        <figure>
+            <svg viewBox="0 0 840 300" role="img" aria-labelledby="fig-grad-title fig-grad-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-grad-title">从底层到高层的语义梯度</title>
+                <desc id="fig-grad-desc">横轴为 Transformer 层号（低层到高层）。底层专家偏向频率/词形统计，中层偏向词性与句法结构，高层偏向语义与情感。语义抽象程度随层数升高。</desc>
+                <line x1="60" y1="240" x2="790" y2="240" stroke="#94a3b8" stroke-width="2"/>
+                <text x="60" y="266" font-size="13" fill="#475569">层 1（底层）</text>
+                <text x="790" y="266" font-size="13" fill="#475569" text-anchor="end">层 N（顶层）</text>
+                <rect x="70" y="150" width="200" height="80" rx="12" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <text x="170" y="184" font-size="14" text-anchor="middle" fill="#0f4c4a">频率 / 词形</text>
+                <text x="170" y="206" font-size="12" text-anchor="middle" fill="#0f4c4a">虚词、后缀、数字</text>
+                <rect x="310" y="120" width="200" height="110" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="410" y="160" font-size="14" text-anchor="middle" fill="#4c1d95">词性 / 句法</text>
+                <text x="410" y="182" font-size="12" text-anchor="middle" fill="#6d28d9">主谓宾、依存结构</text>
+                <rect x="550" y="90" width="200" height="140" rx="12" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="650" y="140" font-size="14" text-anchor="middle" fill="#7c2d12">语义 / 情感</text>
+                <text x="650" y="162" font-size="12" text-anchor="middle" fill="#9a3412">情感极性、领域概念</text>
+                <path d="M290 110 L540 70" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+                <path d="M545 66 l14 -4 -4 14 z" fill="#94a3b8"/>
+                <text x="410" y="52" font-size="13" text-anchor="middle" fill="#475569">语义抽象程度逐层升高</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 层间语义梯度（教学示意）：底层专家偏向频率/词形，中层偏向句法，高层偏向语义与情感。这说明 MoE 的分工不仅在层内，也沿深度形成了一个抽象层次。</figcaption>
+        </figure>
 
         <p>单语义专家告诉我们<strong>在同一层内部</strong>，专家们如何分工。那<strong>不同层之间</strong>呢？一个更宏观的模式出现了：从底层到顶层，专家的语义从"低级的频率统计"逐渐过渡到"高级的语法和语义结构"。研究者称之为<strong>频率→语法梯度（Frequency-to-Grammar Gradient）</strong>。</p>
 
@@ -199,6 +252,36 @@ def analyze_layer_semantic_gradient(model, tokenizer, corpus, top_k=100):
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 频率→语法梯度与我们在第19章讨论的"底层冗余、顶层专化"一脉相承。底层专家之所以冗余，是因为它们都在做一件事：识别高频词。顶层专家之所以专化，是因为它们在做截然不同的高级推理任务。这个梯度不是训练强加的，而是从语言数据中自发涌现的层次化学习结果。它印证了NLP领域一个经典直觉：<strong>神经网络从底层到顶层，学到了从"形式"到"功能"的抽象谱系。</strong>
         </div>
+
+        <div class="moe-widget" id="causal-demo">
+            <p class="widget-q"><strong>交互：</strong>切换因果干预方式，观察模型行为（以示意指标表示）如何被直接改变。</p>
+            <div class="controls" role="group" aria-label="选择干预方式">
+                <button type="button" data-c="base" aria-pressed="true">基线（无干预）</button>
+                <button type="button" data-c="amp" aria-pressed="false">放大情感专家 E7/L9</button>
+                <button type="button" data-c="sup" aria-pressed="false">抑制句法专家 E6/L4</button>
+            </div>
+            <p class="widget-output" aria-live="polite">基线：输出情感强度记作 1.0×，句法正确率正常。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('causal-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                base: '基线：输出情感强度记作 1.0×，句法正确率正常。',
+                amp: '放大情感专家 E7/L9（输出 ×3）：情感强度约 +321%（因果操控，而非相关观察）。',
+                sup: '抑制句法专家 E6/L4：语法明显混乱（主谓宾颠倒等），说明它是因果链条中的关键节点。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-c')];
+                });
+            }
+        })();
+        </script>
 
         <h2>因果干预：+321%语义操控</h2>
 
@@ -342,7 +425,18 @@ print(output)
             <a href="index.html">📖 返回目录</a>
             <a href="23.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>“Disentangling Mixture of Experts with Semantic Activation Patterns”（2025，斯坦福与 Google DeepMind）—— 单语义专家与层间语义梯度（见仓内文献索引）</li>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（分析对象）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V2</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a></li>
+            </ol>
+            <p>单语义专家、频率→语法梯度与因果干预的发现引自相关可解释性研究。单一专家表与干预效果数字（如情感 +321%）为<strong>教学引用/示意</strong>；层间梯度图为<strong>教学示意</strong>。待验证细节以原始论文为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

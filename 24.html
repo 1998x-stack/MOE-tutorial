@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第24章 消费级硬件部署MoE</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,10 +49,35 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第24章 消费级硬件部署 MoE</h1>
+            <p class="dek">在一张 4090 上跑百亿级 MoE：CPU-GPU 协同、SSD 流式加载与分层量化，拆解三层递进的部署技术。</p>
+        </header>
 
         <h2>为什么要在4090上跑MoE？</h2>
+
+        <p>MoE 天生适合“按需卸载”：把暂时用不到的专家放在慢一级的存储里，需要时再搬进来。这依托于一个存储层次结构——容量越大，带宽越低。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 300" role="img" aria-labelledby="fig-hier-title fig-hier-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-hier-title">MoE 部署的三级存储层次</title>
+                <desc id="fig-hier-desc">三层存储：GPU 显存容量小但带宽最高（约 24GB / TB·s 级），CPU 内存容量中等、带宽中等（数十到数百 GB），NVMe SSD 容量最大但带宽最低（GB/s 量级）。MoE 按需把专家在层间搬运。</desc>
+                <polygon points="300,40 540,40 600,110 240,110" fill="#d7f2ef" stroke="#147f80" stroke-width="2"/>
+                <text x="420" y="72" font-size="14" text-anchor="middle" fill="#0f4c4a" font-weight="700">GPU 显存（HBM）</text>
+                <text x="420" y="94" font-size="12" text-anchor="middle" fill="#0f4c4a">~24GB｜带宽最高（TB/s 量级）</text>
+                <polygon points="240,120 600,120 660,200 180,200" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="420" y="156" font-size="14" text-anchor="middle" fill="#4c1d95" font-weight="700">CPU 内存（DRAM）</text>
+                <text x="420" y="180" font-size="12" text-anchor="middle" fill="#6d28d9">64–256GB｜带宽中等（数十–数百 GB/s）</text>
+                <polygon points="180,210 660,210 720,290 120,290" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="420" y="246" font-size="14" text-anchor="middle" fill="#7c2d12" font-weight="700">NVMe SSD</text>
+                <text x="420" y="270" font-size="12" text-anchor="middle" fill="#9a3412">1–2TB｜带宽最低（GB/s 量级，随机读高 IOPS）</text>
+                <text x="20" y="60" font-size="13" fill="#475569">容量 ↑</text>
+                <text x="20" y="250" font-size="13" fill="#475569">带宽 ↓</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 三级存储层次：越往下容量越大、带宽越低。MoE 稀疏激活使得每次只需搬运少量专家，才让“慢存储跑大模型”成为可能（容量/带宽为教学示意）。</figcaption>
+        </figure>
 
         <p>大家好，我是你们的讲师。上一章我们聊了MoE推理优化的各种花式策略——专家预取、投机执行——但有一个前提始终躲不开：<strong>你得有足够的显存来装下模型</strong>。对于绝大多数独立开发者、高校实验室和小型企业来说，一张A100/H100的预算动辄二三十万人民币，而一张RTX 4090只要一万多——显存却只有24GB。用4090跑一个几百B参数的MoE模型，听起来像是用自行车拖航母。</p>
 
@@ -202,6 +235,22 @@ async def ssd_moe_inference(prompt, model, ssd_path):
 
         <h2>量化策略：4-bit MoE还顶用吗？</h2>
 
+        <p>量化后的模型体积由参数量 <math class="math-inline" aria-label="P"><mi>P</mi></math> 与量化位数 <math class="math-inline" aria-label="b"><mi>b</mi></math> 决定：</p>
+
+        <div class="math-equation" role="group" aria-label="量化后模型体积公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="量化体积公式，可横向滚动">
+                <math display="block" aria-label="模型存储大小约等于参数量 P 乘量化位数 b 除以 8 字节">
+                    <mrow>
+                        <mi>S</mi><mo>=</mo>
+                        <mfrac><mrow><mi>P</mi><mo>·</mo><mi>b</mi></mrow><mn>8</mn></mfrac>
+                        <mtext>字节</mtext>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>以 671B 参数为例：FP16（<math class="math-inline" aria-label="b=16"><mi>b</mi><mo>=</mo><mn>16</mn></math>）约 1.34TB，INT8 约 671GB，INT4 约 335GB——这正是“4-bit 让 671B 进入消费级存储”的算术依据（图中略去激活、KV Cache 与框架开销）。</p>
+
         <p>前面的所有讨论都基于一个关键前提：<strong>量化</strong>。没有量化，你不可能把671B的模型塞进任何一个消费级存储系统——FP16下光模型参数就要1.3TB，NVMe都得填满一整块。而量化到INT4，同样的模型只有335GB，压缩了4倍。但问题是：<strong>MoE模型对量化的敏感度和Dense模型一样吗？</strong>——答案是否定的，而且结论非常有趣。</p>
 
         <p>2025年有多篇论文研究了MoE模型的量化敏感性，得出了一个有点反直觉的结论：<strong>MoE的专家权重对量化的容忍度，远高于Dense模型中的等量参数</strong>。原因在于：在Dense模型中，每一层FFN的所有参数都在参与当前token的计算，量化误差会直接累积到输出；而在MoE中，每个token只使用2-4个专家的参数，其他专家的量化误差和当前token完全无关——这是"稀疏激活"带来的额外红利。</p>
@@ -298,6 +347,42 @@ QUANT_CONFIG = {
             <strong>🔑 关键洞察：</strong> 4-bit MoE 依然顶用，但不是所有部分都能 4-bit。核心经验可以用一句话总结：<strong>"路由全精度、专家低精度、激活全精度"</strong>。量化参数（权重）保留关键位置的精度，而激活值（activation）全程保持 FP16——因为激活值上的量化误差会通过非线性层被急剧放大。这个配置下，INT4 MoE 在大部分 NLP 任务上的退化在 2% 以内，而模型体积缩小到原来的 1/4，值得！
         </div>
 
+        <div class="moe-widget" id="quant-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 671B 参数（DeepSeek-V3 量级），切换量化位数，看模型体积如何变化。</p>
+            <div class="controls" role="group" aria-label="选择量化位数">
+                <button type="button" data-b="16" aria-pressed="false">FP16 (16-bit)</button>
+                <button type="button" data-b="8" aria-pressed="false">INT8 (8-bit)</button>
+                <button type="button" data-b="4" aria-pressed="true">INT4 (4-bit)</button>
+            </div>
+            <p class="widget-output" aria-live="polite">INT4（4-bit）：671B × 4 / 8 ≈ 335 GB（不含激活与 KV Cache）。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('quant-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var P = 671e9;
+            function fmt(bits) {
+                var bytes = P * bits / 8;
+                var tb = bytes / 1e12, gb = bytes / 1e9;
+                return bytes >= 1e12 ? tb.toFixed(2) + ' TB' : Math.round(gb) + ' GB';
+            }
+            function render(bits) {
+                out.textContent = (bits === 16 ? 'FP16（16-bit）' : 'INT' + bits + '（' + bits + '-bit）') + '：671B × ' + bits +
+                    ' / 8 ≈ ' + fmt(bits) + '（不含激活与 KV Cache）。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseInt(this.getAttribute('data-b'), 10));
+                });
+            }
+            render(4);
+        })();
+        </script>
+
         <p>从本章的内容，你可以看到：在消费级硬件上跑MoE已经不是一个"能做"的问题，而是一个"做得有多好"的问题。CPU-GPU协同解决了专家权重的按需加载问题，SSD流式加载打破了内存容量的天花板，而分层量化策略在模型质量和部署可行性之间找到了精妙的平衡点。三条技术路线叠加，让RTX 4090上跑DeepSeek-V3成为了现实。</p>
 
         <p>但这一切都建立在<strong>专家数量固定、路由模式固定</strong>的假设之下。如果我们可以更进一步：让模型根据输入难度，<strong>动态调整</strong>激活的专家数量，会怎样？这就是下一章的主题——<strong>自适应路由与动态推理</strong>。我们将看到，在推理时动态调整计算预算，如何在几乎不损失质量的前提下节省20-30%的算力。</p>
@@ -307,7 +392,18 @@ QUANT_CONFIG = {
             <a href="index.html">📖 返回目录</a>
             <a href="25.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（671B 参数规模）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V2</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a>（236B 总参部署对象）</li>
+                <li>llama.cpp / Ollama 社区工程实践，2025–2026（消费级 MoE 推理，见仓内文献索引）</li>
+            </ol>
+            <p>存储层次容量/带宽、CPU-GPU 协同与 SSD 流式加载、分层量化策略为<strong>教学整理/估算（已作简化）</strong>；「4.4× 加速」与各项目报告的性能数字为<strong>教学示意</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

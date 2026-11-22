@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第21章 时间记忆与预测性路由</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第21章 时间记忆与预测性路由</h1>
+            <p class="dek">路由器也能有记忆：用 LIF 脉冲动力学为每个专家维护“电荷”，再用精度加权门控让路由器知道自己有多不确定。</p>
+        </header>
 
         <h2>当路由失去记忆</h2>
 
@@ -59,6 +71,43 @@
         </div>
 
         <h2>LIF脉冲神经动力学：给路由器加个"电池"</h2>
+
+        <p>LIF 神经元可以看作一个带泄露的电荷积分器。为每个专家维护一个电荷状态 <math class="math-inline" aria-label="c_i(t)"><msub><mi>c</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo></math>，每个时间步：</p>
+
+        <div class="math-equation" role="group" aria-label="LIF 电荷更新公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="LIF 电荷更新公式，可横向滚动">
+                <math display="block" aria-label="第 i 个专家在 t 时刻的电荷等于 tau 乘上一时刻电荷加上输入；当电荷超过阈值 theta 时点火并被选中重建">
+                    <mrow>
+                        <msub><mi>c</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo>
+                        <mi>τ</mi><mo>·</mo><msub><mi>c</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>t</mi><mo>−</mo><mn>1</mn><mo stretchy="false">)</mo><mo>+</mo><msub><mi>x</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo>
+                        <mo>,</mo><mspace width="0.6em"/>
+                        <msub><mi>c</mi><mi>i</mi></msub><mo>&gt;</mo><mi>θ</mi><mo>⇒</mo><mtext>点火</mtext>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="tau 是泄露系数"><mi>τ</mi></math>（<math class="math-inline" aria-label="0 小于 tau 小于 1"><mn>0</mn><mo>&lt;</mo><mi>τ</mi><mo>&lt;</mo><mn>1</mn></math>）控制电荷衰减速度：<math class="math-inline" aria-label="tau 越接近 1"><mi>τ</mi></math> 越接近 1，电荷保持越久，「记忆」越长。</p>
+
+        <figure>
+            <svg viewBox="0 0 800 320" role="img" aria-labelledby="fig-lif-title fig-lif-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-lif-title">两个专家的 LIF 电荷随时间的变化</title>
+                <desc id="fig-lif-desc">横轴为时间步，纵轴为电荷。经常被选中的专家 A 的电荷不断积累并多次越过阈值 θ（点火）；很少被选中的专家 B 的电荷则衰减到接近零。</desc>
+                <line x1="80" y1="270" x2="760" y2="270" stroke="#94a3b8" stroke-width="2"/>
+                <line x1="80" y1="60" x2="80" y2="270" stroke="#94a3b8" stroke-width="2"/>
+                <text x="80" y="50" font-size="13" fill="#475569">电荷</text>
+                <text x="740" y="290" font-size="13" fill="#475569" text-anchor="end">时间步 →</text>
+                <line x1="80" y1="100" x2="760" y2="100" stroke="#ef4444" stroke-width="2" stroke-dasharray="7 5"/>
+                <text x="764" y="104" font-size="12" fill="#b91c1c">θ</text>
+                <polyline points="90,250 160,190 230,130 300,200 370,140 440,90 510,180 580,120 650,90 720,170" fill="none" stroke="#147f80" stroke-width="3"/>
+                <polyline points="90,250 160,260 230,266 300,250 370,190 440,240 510,260 580,266 650,268 720,270" fill="none" stroke="#7c3aed" stroke-width="3"/>
+                <g font-size="12" fill="#0f4c4a"><text x="470" y="82">专家 A（常被选中）</text></g>
+                <g font-size="12" fill="#4c1d95"><text x="470" y="262">专家 B（很少被选中）</text></g>
+                <g fill="#ef4444"><circle cx="230" cy="130" r="0"/></g>
+                <text x="440" y="60" font-size="12" fill="#b91c1c">跨过 θ 即“点火”：该步被选中并重置电荷</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> LIF 电荷随时间的积累与衰减（教学示意）：常被选中的专家电荷长期高位（记忆强），很少被选中的专家电荷趋零。这使路由在时间上具有惯性和连续性。</figcaption>
+        </figure>
 
         <p>给路由器加记忆，最容易想到的方法是直接把路由器的隐藏状态变成一个循环结构——比如把路由器换成一个小型GRU或LSTM。但这偏离了MoE"轻量级路由器"的设计原则：如果路由器本身变得和专家一样重，整个架构就不稀疏了。</p>
 
@@ -181,6 +230,36 @@ class LIFRouter(nn.Module):
         <div class="tip">
             <strong>💡 参数调优建议：</strong> tau（时间常数）控制记忆的"时长"。tau=0.5 意味着电荷半衰期约1步（几乎无记忆），tau=0.9 意味着电荷半衰期约7步。对于短文本（句子级），推荐 tau=0.7-0.8；对于长文本（段落级），推荐 tau=0.9-0.95。阈值 threshold 控制切换灵敏度：阈值越低，路由惯性越强，但可能延迟对新模式的响应。
         </div>
+
+        <div class="moe-widget" id="tau-demo">
+            <p class="widget-q"><strong>交互：</strong>切换泄露系数 τ，看电荷的「半衰期」（记忆长度）如何变化。</p>
+            <div class="controls" role="group" aria-label="选择泄露系数 τ">
+                <button type="button" data-t="0.9" aria-pressed="false">τ = 0.9</button>
+                <button type="button" data-t="0.99" aria-pressed="true">τ = 0.99</button>
+                <button type="button" data-t="0.999" aria-pressed="false">τ = 0.999</button>
+            </div>
+            <p class="widget-output" aria-live="polite">τ=0.99：电荷半衰期 ≈ ln2 / ln(1/0.99) ≈ 69 步，记忆长度约 70 个 token。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('tau-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            function render(t) {
+                var half = Math.log(2) / Math.log(1 / t);
+                out.textContent = 'τ=' + t + '：电荷半衰期 ≈ ln2 / ln(1/' + t + ') ≈ ' + half.toFixed(0) + ' 步，记忆长度约 ' + half.toFixed(0) + ' 个 token。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseFloat(this.getAttribute('data-t')));
+                });
+            }
+            render(0.99);
+        })();
+        </script>
 
         <h2>精度加权门控：让每个专家知道自己的不确定性</h2>
 
@@ -320,7 +399,17 @@ class PrecisionWeightedGate(nn.Module):
             <a href="index.html">📖 返回目录</a>
             <a href="22.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（基线路由对比）</li>
+                <li>Fedus 等，<em>Switch Transformers</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a>（路由基础）</li>
+            </ol>
+            <p>本章属于探索性前沿方向。LIF 脉冲动力学与精度加权门控、以及「域迁移 124× 提升」「τ=0.99 半衰期 70 步」等具体数字均标注为<strong>教学示意</strong>（LIF 电荷曲线亦为示意），用于说明机制，不代表已发表论文的实测结果；实际操作以原始文献为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第23章 MoE推理优化：Prefill与Decode</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第23章 MoE 推理优化：Prefill 与 Decode</h1>
+            <p class="dek">MoE 推理的真正瓶颈不是算力而是“搬专家”。看 Prefill/Decode 的差异，以及预取与投机执行如何隐藏专家加载延迟。</p>
+        </header>
 
         <h2>MoE推理的独特挑战</h2>
 
@@ -57,6 +69,45 @@
         </div>
 
         <h2>Prefill与Decode阶段的不同需求</h2>
+
+        <p>Decode 阶段每生成一个 token，都要把被选中的 k 个专家权重从显存/内存里读进来，加载时间可以用带宽近似：</p>
+
+        <div class="math-equation" role="group" aria-label="专家加载时间公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="专家加载时间公式，可横向滚动">
+                <math display="block" aria-label="加载 k 个专家所需时间约等于 k 乘单个专家权重字节数 W_exp 除以内存带宽 B_mem">
+                    <mrow>
+                        <msub><mi>T</mi><mrow><mi>load</mi></mrow></msub><mo>≈</mo>
+                        <mfrac><mrow><mi>k</mi><mo>·</mo><msub><mi>W</mi><mrow><mi>exp</mi></mrow></msub></mrow><msub><mi>B</mi><mrow><mi>mem</mi></mrow></msub></mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>Prefill 时一个 batch 的很多 token 同时激活很多专家，加载可以被计算掩蔽；而 Decode 只有极少数专家、计算量很小，<math class="math-inline" aria-label="T_load"><msub><mi>T</mi><mrow><mi>load</mi></mrow></msub></math> 很容易成为瓶颈。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 300" role="img" aria-labelledby="fig-pd-title fig-pd-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-pd-title">Prefill 与 Decode 阶段的瓶颈差异</title>
+                <desc id="fig-pd-desc">左图 Prefill：一个 batch 大量 token 同时激活许多专家，计算条很长、加载条很短，属于计算受限。右图 Decode：每次只生成一个 token，计算条很短而专家加载条很长，属于访存受限。</desc>
+                <rect x="20" y="50" width="390" height="230" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <rect x="430" y="50" width="390" height="230" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <text x="215" y="34" font-size="14" font-weight="700" fill="#147f80" text-anchor="middle">Prefill：计算受限 ✓</text>
+                <text x="625" y="34" font-size="14" font-weight="700" fill="#b91c1c" text-anchor="middle">Decode：访存受限 ✗</text>
+                <text x="50" y="100" font-size="13" fill="#475569">计算</text>
+                <rect x="110" y="82" width="270" height="30" rx="6" fill="#147f80"/>
+                <text x="50" y="160" font-size="13" fill="#475569">专家加载</text>
+                <rect x="110" y="142" width="90" height="30" rx="6" fill="#d06d4d"/>
+                <text x="50" y="235" font-size="12" fill="#475569">多 token 同时激活多专家，</text>
+                <text x="50" y="255" font-size="12" fill="#475569">加载被计算掩蔽。</text>
+                <text x="460" y="100" font-size="13" fill="#475569">计算</text>
+                <rect x="520" y="82" width="70" height="30" rx="6" fill="#147f80"/>
+                <text x="460" y="160" font-size="13" fill="#475569">专家加载</text>
+                <rect x="520" y="142" width="280" height="30" rx="6" fill="#d06d4d"/>
+                <text x="460" y="235" font-size="12" fill="#475569">每步只算 1 个 token，却要等</text>
+                <text x="460" y="255" font-size="12" fill="#475569">k 个专家权重加载完。</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 同一模型在两个阶段的瓶颈不同：Prefill 计算受限，Decode 访存受限。MoE 推理优化因此把重点放在 Decode 的“专家加载”上（预取、投机执行、缓存热点专家）。</figcaption>
+        </figure>
 
         <p>现代LLM推理通常分为两个阶段：<strong>Prefill（预填充）</strong>和<strong>Decode（解码）</strong>。这两个阶段在MoE场景下的行为差异巨大，值得分别讨论。</p>
 
@@ -113,6 +164,36 @@
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 如果你在部署 MoE 模型时发现 Prefill 很快但 Decode 很慢，大概率不是计算代码的问题，而是显存访问模式的问题。一个常见优化思路是：在 Decode 阶段使用更大的 batch size（把多个用户的请求合并），让更多的 token 共享专家加载的开销——这也是 MoE 推理服务框架中"动态批处理"的主要动机。
         </div>
+
+        <div class="moe-widget" id="see-demo">
+            <p class="widget-q"><strong>交互：</strong>投机性专家执行（SEE）在预测命中率不同时，Decode 延迟大致能降低多少？</p>
+            <div class="controls" role="group" aria-label="选择预测命中率">
+                <button type="button" data-h="35" aria-pressed="false">命中率 35%</button>
+                <button type="button" data-h="60" aria-pressed="true">命中率 60%</button>
+                <button type="button" data-h="82" aria-pressed="false">命中率 82%</button>
+            </div>
+            <p class="widget-output" aria-live="polite">命中率 60%：猜对时省下整条等待，猜错只浪费部分计算，Decode 延迟约 -20%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('see-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                '35': '命中率 35%：收益有限，Decode 延迟约 -5%，并需额外的变化检测。',
+                '60': '命中率 60%：猜对时省下整条等待，猜错只浪费部分计算，Decode 延迟约 -20%。',
+                '82': '命中率 82%：收益明显，Decode 延迟约 -37%（top-3 命中真实专家）。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-h')];
+                });
+            }
+        })();
+        </script>
 
         <h2>专家预取：YaliS框架深度解析</h2>
 
@@ -257,7 +338,18 @@ def speculative_decode(token, experts, router, detector):
             <a href="index.html">📖 返回目录</a>
             <a href="24.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（部署对象）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V2</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a></li>
+                <li>YaliS（上海 AI 实验室，2025，MoE 推理优化框架）—— 专家预取与预测性加载（见仓内文献索引）</li>
+            </ol>
+            <p>Prefill/Decode 瓶颈差异与专家加载时间模型为<strong>教学说明/简化</strong>；YaliS 的「延迟 -37%」「top-3 命中 82%」与 SEE 自适应策略的命中率/收益数字均为<strong>教学示意</strong>，实际以对应框架报告为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
