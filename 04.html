@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第4章 2017开山之作：Sparsely-Gated MoE (上)</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第4章 2017 开山之作：Sparsely-Gated MoE（上）</h1>
+            <p class="dek">拆解现代稀疏 MoE 的三大基石：Noisy Top-K Gating 如何让离散选择可训练，专家容量如何限制负载，辅助损失如何给门控上紧箍咒。</p>
+        </header>
 
         <h2>2017年：深度学习遇到了MoE</h2>
 
@@ -61,6 +72,24 @@
         <p>1991年的门控是"软"的——所有专家的权重都通过softmax计算，然后加权求和。2017年的门控是"硬"的——只选top-k个专家，其余专家的输出为零。但这里有一个微妙的问题：<strong>"选top-k"这个操作本身是不可微的</strong>。argmax或top-k选择的梯度是0或无穷大，无法通过反向传播来训练门控网络。</p>
 
         <p>Shazeer的解决方案巧妙至极：在计算门控得分时加入可调的高斯噪声，然后在训练时通过噪声的梯度来近似离散选择的梯度：</p>
+
+        <div class="math-equation" role="group" aria-label="Noisy Top-K 门控得分公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="带噪门控得分公式，可横向滚动">
+                <math display="block" aria-label="带噪门控得分 H(x)_i 等于 x 乘 W_g 的第 i 个分量 加上 标准正态噪声 N(0,1) 乘以 softplus 作用于 x 乘 W_noise 的第 i 个分量">
+                    <mrow>
+                        <mi>H</mi><mo stretchy="false">(</mo><mi>x</mi><msub><mo stretchy="false">)</mo><mi>i</mi></msub>
+                        <mo>=</mo>
+                        <msub><mrow><mo stretchy="false">(</mo><mi>x</mi><msub><mi>W</mi><mi>g</mi></msub><mo stretchy="false">)</mo></mrow><mi>i</mi></msub>
+                        <mo>+</mo>
+                        <mi>N</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false">)</mo>
+                        <mo>·</mo>
+                        <mrow><mi>Softplus</mi><mo stretchy="false">(</mo><msub><mrow><mi>x</mi><msub><mi>W</mi><mrow><mi>noise</mi></mrow></msub></mrow><mi>i</mi></msub><mo stretchy="false">)</mo></mrow>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>得到带噪得分后，只保留其中最大的 k 个（其余置 <math class="math-inline" aria-label="负无穷"><mo>−</mo><mi>∞</mi></math>），再做 softmax：<math class="math-inline" aria-label="g 等于 softmax 作用于保留 top-k 后的 H(x)"><mi>g</mi><mo>=</mo><mi>Softmax</mi><mo stretchy="false">(</mo><mi>KeepTopK</mi><mo stretchy="false">(</mo><mi>H</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></math>。这就是论文的式 (1)(2)。</p>
 
         <pre><code># Noisy Top-K Gating 的数学实现（PyTorch风格伪码）
 import torch
@@ -106,6 +135,77 @@ class NoisyTopKGate(nn.Module):
 
         <p>噪声的幅度本身也是<strong>可学习的</strong>——这就是代码中 <code>self.w_noise</code> 的作用。门控网络自己学会了"应该加多少噪声"：噪声太大让路由变得随机（影响性能），噪声太小则探索不够。通过端到端的训练，门控网络会找到一个平衡点。</p>
 
+        <figure>
+            <svg viewBox="0 0 900 300" role="img" aria-labelledby="fig-noisy-title fig-noisy-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-noisy-title">Noisy Top-K Gating 的计算流程</title>
+                <desc id="fig-noisy-desc">输入 x 分别经过线性层 W_g 得到得分、经过线性层 W_noise 与 Softplus 得到可学习噪声尺度；两者相加后做 KeepTop-K 选择，再经过 softmax 得到稀疏门控权重 g。</desc>
+                <rect x="20" y="120" width="70" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="55" y="148" font-size="15" text-anchor="middle" fill="#7c2d12">x</text>
+                <path d="M92 142 C108 142 108 86 120 86" stroke="#94a3b8" stroke-width="1.6" fill="none"/>
+                <path d="M92 142 C108 142 108 244 120 244" stroke="#94a3b8" stroke-width="1.6" fill="none"/>
+                <rect x="120" y="62" width="150" height="48" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="195" y="92" font-size="14" text-anchor="middle" fill="#4c1d95">线性 W_g → logits</text>
+                <rect x="120" y="220" width="150" height="48" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="195" y="250" font-size="14" text-anchor="middle" fill="#3730a3">线性 W_noise</text>
+                <path d="M272 244 h34" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M310 238 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="310" y="220" width="200" height="48" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="410" y="250" font-size="14" text-anchor="middle" fill="#3730a3">Softplus(·) · N(0,1)</text>
+                <path d="M410 218 C410 180 380 168 360 158" stroke="#94a3b8" stroke-width="1.6" fill="none"/>
+                <path d="M272 86 h50" stroke="#94a3b8" stroke-width="1.6"/>
+                <circle cx="356" cy="118" r="26" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <text x="356" y="126" font-size="20" text-anchor="middle" fill="#0f4c4a">+</text>
+                <path d="M362 88 C362 100 362 100 356 92" stroke="#94a3b8" stroke-width="1.6" fill="none"/>
+                <path d="M384 118 h34" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M422 112 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="422" y="94" width="150" height="48" rx="12" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="497" y="124" font-size="14" text-anchor="middle" fill="#14532d">KeepTop-K</text>
+                <path d="M574 118 h30" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M608 112 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="608" y="94" width="130" height="48" rx="12" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="673" y="124" font-size="14" text-anchor="middle" fill="#14532d">Softmax</text>
+                <path d="M740 118 h30" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M774 112 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="774" y="94" width="100" height="48" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="824" y="124" font-size="15" text-anchor="middle" fill="#3730a3">门控 g</text>
+                <text x="30" y="290" font-size="14" fill="#0f4c4a">噪声尺度由网络自学：太大会使路由变随，太小则探索不足</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> Noisy Top-K Gating 的前向路径：在 logits 上叠加一个方差可学习的高斯噪声，再取 Top-K、做 softmax。噪声仅参与训练，推理时去掉，这使不可微的 top-k 选择在期望意义上获得梯度。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="cap-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 N=65536 tokens、E=512 专家、k=2，切换容量因子 C，看每个专家的容量与冗余比例如何变化。</p>
+            <div class="controls" role="group" aria-label="选择容量因子 C">
+                <button type="button" data-c="1" aria-pressed="false">C = 1.0</button>
+                <button type="button" data-c="1.25" aria-pressed="true">C = 1.25</button>
+                <button type="button" data-c="1.5" aria-pressed="false">C = 1.5</button>
+            </div>
+            <p class="widget-output" aria-live="polite">C=1.25：每专家容量 = ⌈1.25 × 2 × 65536 / 512⌉ = 320 tokens；平均应为 256 tokens，冗余 25%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('cap-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var N = 65536, E = 512, k = 2;
+            function render(c) {
+                var avg = k * N / E;
+                var cap = Math.ceil(c * k * N / E);
+                out.textContent = 'C=' + c + '：每专家容量 = ⌈' + c + ' × ' + k + ' × ' + N + ' / ' + E +
+                    '⌉ = ' + cap + ' tokens；平均应为 ' + avg.toFixed(0) + ' tokens，冗余 ' + ((c - 1) * 100).toFixed(0) + '%。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseFloat(this.getAttribute('data-c')));
+                });
+            }
+            render(1.25);
+        })();
+        </script>
+
         <div class="tip">
             <strong>💡 理解关键：</strong> Noisy Top-K Gating 中的噪声机制是MoE训练早期最重要的技巧之一。它本质上在做一件 elegant 的事：用一个可微分的噪声估计来"软化"一个不可微分的离散选择。这种"用随机性换可微性"的思路在深度学习中有很多应用（如Gumbel-Softmax、VQ-VAE），Noisy Top-K Gating 是其中最早也最成功的案例之一。
         </div>
@@ -117,6 +217,19 @@ class NoisyTopKGate(nn.Module):
         <p>在训练时，我们是把整个batch的token同时送入MoE层的。假设batch中有N个token，每个token选择top-2专家。如果没有约束，理论上每个专家被选中的次数是 (N × k) / E。但实际上，由于路由倾向于某些专家，分布会严重不平衡——某些"明星专家"可能会收到远多于平均水平的token，而另一些专家则门可罗雀。</p>
 
         <p>这就是<strong>专家容量</strong>（Expert Capacity）设计的用武之地。</p>
+
+        <div class="math-equation" role="group" aria-label="专家容量公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="专家容量公式，可横向滚动">
+                <math display="block" aria-label="专家容量等于容量因子 C 乘以 k 乘 N 除以 E 之后向上取整">
+                    <mrow>
+                        <mi>capacity</mi><mo>=</mo><mo>⌈</mo>
+                        <mi>C</mi><mo>·</mo>
+                        <mfrac><mrow><mi>k</mi><mi>N</mi></mrow><mi>E</mi></mfrac>
+                        <mo>⌉</mo>
+                    </mrow>
+                </math>
+            </div>
+        </div>
 
         <p>专家容量的核心思想非常直观：<strong>给每个专家设定一个"接单上限"</strong>。如果某个专家收到的token数超过了这个上限，多出来的token会被丢弃（dropped），或者被转发到其他专家（overflow）。通过限制每个专家最多能处理的token数量，专家容量确保了计算资源的公平分配和显存的合理利用。</p>
 
@@ -191,7 +304,7 @@ print(f"冗余比例: {capacity_factor - 1:.0%}")
 # 每个专家实际预计接收: 256.0 tokens
 # 冗余比例: 25%</code></pre>
 
-        <p>容量因子C是一个极其重要的超参数：C越接近1，计算效率越高（浪费少），但token被丢弃的概率越大；C越大，token丢弃越少，但GPU计算和显存的浪费越多。论文中的经验值是C=1.25到1.5之间——这个取值区间至今仍是工程实践中的黄金标准。</p>
+        <p>容量因子C是一个极其重要的超参数：C越接近1，计算效率越高（浪费少），但token被丢弃的概率越大；C越大，token丢弃越少，但GPU计算和显存的浪费越多。论文中的经验值是C=1.25到1.5之间——这个取值区间至今仍是工程实践中的黄金标准。需要强调的是，上表与代码中的数值是<strong>教学演算</strong>（由公式直接算得），论文中 N、E、k 的实际取值随实验而异。</p>
 
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 专家容量是"效率"和"完整性"之间的一个trade-off。设容量因子为1.0时，计算效率达到理论最优，但在负载不均时会有大量token被丢弃（信息丢失）。设置1.25时，允许25%的不均衡，在绝大多数情况下可以避免token丢失。我自己的实战经验是：在训练初期使用较大的容量因子（1.5），随着训练推进逐步降低（1.1-1.2）——因为训练后期路由越来越均衡，不需要太多冗余空间。
@@ -287,7 +400,18 @@ def load_balancing_loss(gate_output, top_k_indices, num_experts):
             <a href="index.html">📖 返回目录</a>
             <a href="05.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，ICLR 2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（式 (1)(2)、容量公式见其 §2.1）</li>
+                <li>Lepikhin 等，<em>GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding</em>，2020。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a></li>
+                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022。<a href="https://arxiv.org/abs/2202.09368">arXiv:2202.09368</a></li>
+            </ol>
+            <p>“137B 参数”与“C=1.25–1.5”均引自 Shazeer 等原文及仓内 <code>pdfs/02_Sparsely-Gated_MoE_2017_Shazeer.pdf</code>；辅助损失系数区间的推荐表为<strong>教学经验总结</strong>（已作简化），仅用于建立量级直觉。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

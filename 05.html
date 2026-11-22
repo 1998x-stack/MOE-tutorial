@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第5章 2017开山之作：Sparsely-Gated MoE (下)</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第5章 2017 开山之作：Sparsely-Gated MoE（下）</h1>
+            <p class="dek">看 MoE 如何嵌入 Transformer：为何替换 FFN 而非 Attention，大规模训练为何会崩，以及 137B 参数实验到底证明了什么。</p>
+        </header>
 
         <h2>从门控到Transformer：MoE层的嵌入</h2>
 
@@ -70,7 +81,26 @@
             <li><strong>FFN是参数量大头</strong>：在Transformer中，FFN占了约2/3的总参数量（每个token要通过两个大矩阵乘法）。用MoE替换FFN可以最大化"稀疏化"带来的收益。</li>
         </ul>
 
-        <p>那么，一个标准的MoE-Transformer层是怎么运作的呢？</p>
+        <p>那么，一个标准的MoE-Transformer层是怎么运作的呢？用公式表达，一个「半稀疏」Block 的前向为：</p>
+
+        <div class="math-equation" role="group" aria-label="MoE-Transformer 块公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="MoE-Transformer 块公式，可横向滚动">
+                <math display="block" aria-label="先算稠密注意力子层 h 等于 x 加上注意力作用于 LN(x)，再算稀疏 FFN 子层 y 等于 h 加上对所有被选中 i 加权求和 g_i 乘以 E_i 作用于 LN(h)">
+                    <mrow>
+                        <mi>h</mi><mo>=</mo><mi>x</mi><mo>+</mo><mi>Attn</mi><mo stretchy="false">(</mo><mi>LN</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo>
+                        <mo>,</mo>
+                        <mspace width="1em"/>
+                        <mi>y</mi><mo>=</mo><mi>h</mi><mo>+</mo>
+                        <munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mi>TopK</mi></mrow></munder>
+                        <msub><mi>g</mi><mi>i</mi></msub>
+                        <msub><mi>E</mi><mi>i</mi></msub>
+                        <mo stretchy="false">(</mo><mi>LN</mi><mo stretchy="false">(</mo><mi>h</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>第一个子层里的 <math class="math-inline" aria-label="Attn"><mi>Attn</mi></math> 对所有 token 稠密计算，第二个子层里的求和只遍历被选中的 <math class="math-inline" aria-label="TopK"><mi>TopK</mi></math> 个专家。</p>
 
         <pre><code># MoE-Transformer 层前向传播
 def moe_transformer_layer(x, self_attention, moe_ffn, router, num_experts, k=2):
@@ -109,6 +139,41 @@ def moe_transformer_layer(x, self_attention, moe_ffn, router, num_experts, k=2):
     return x</code></pre>
 
         <p>上面的代码中有一个关键设计点：<strong>for循环按专家进行</strong>，而不是按token进行。这是出于计算效率的考虑——把所有路由到同一个专家的token打包成batch，一次性送入该专家的FFN，可以最大化GPU的矩阵运算效率。这也是"专家并行"的雏形——不同专家可以放在不同GPU上，各自处理自己收到的token。</p>
+
+        <figure>
+            <svg viewBox="0 0 860 360" role="img" aria-labelledby="fig-block-title fig-block-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-block-title">MoE-Transformer Block 的半稀疏结构</title>
+                <desc id="fig-block-desc">输入 x 进入 Transformer Block；先经过稠密的 Self-Attention 子层（全部 token 参与），再经过稀疏的 MoE-FFN 子层（四个专家中只激活两个），两个子层各有一条残差连接，输出为 y。</desc>
+                <rect x="20" y="152" width="76" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="58" y="180" font-size="15" text-anchor="middle" fill="#7c2d12">输入 x</text>
+                <rect x="130" y="40" width="600" height="272" rx="18" fill="#ffffff" stroke="#c4b5fd" stroke-width="2"/>
+                <text x="150" y="66" font-size="14" font-weight="700" fill="#4c1d95">Transformer Block</text>
+                <rect x="152" y="80" width="556" height="62" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="430" y="106" font-size="15" text-anchor="middle" fill="#3730a3">Self-Attention 子层</text>
+                <text x="430" y="128" font-size="13" text-anchor="middle" fill="#475569">稠密：全部 token 参与 O(n²)</text>
+                <text x="152" y="168" font-size="14" font-weight="700" fill="#4c1d95">MoE-FFN 子层（稀疏：仅 2/4 激活）</text>
+                <g font-size="13">
+                    <rect x="152" y="178" width="130" height="60" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="217" y="214" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 1 ✓</text>
+                    <rect x="294" y="178" width="130" height="60" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="6 4"/>
+                    <text x="359" y="214" text-anchor="middle" fill="#94a3b8">专家 2</text>
+                    <rect x="436" y="178" width="130" height="60" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="501" y="214" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 3 ✓</text>
+                    <rect x="578" y="178" width="130" height="60" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="6 4"/>
+                    <text x="643" y="214" text-anchor="middle" fill="#94a3b8">专家 4</text>
+                </g>
+                <text x="152" y="268" font-size="13" fill="#6d28d9">Router 在子层入口根据 x 选择专家</text>
+                <path d="M98 174 h30" stroke="#94a3b8" stroke-width="1.8"/>
+                <path d="M132 168 l10 6 -10 6 z" fill="#94a3b8"/>
+                <path d="M732 174 h30" stroke="#94a3b8" stroke-width="1.8"/>
+                <path d="M766 168 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="778" y="152" width="76" height="44" rx="10" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="816" y="180" font-size="15" text-anchor="middle" fill="#14532d">输出 y</text>
+                <path d="M58 200 V330 H816 V200" stroke="#d06d4d" stroke-width="1.6" fill="none" stroke-dasharray="7 5"/>
+                <text x="430" y="348" font-size="13" text-anchor="middle" fill="#7c2d12">虚线：两个子层各自的残差连接</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> MoE-Transformer Block 的「半稀疏」结构：Self-Attention 子层保持稠密（需全局视野），MoE-FFN 子层稀疏化（可专业化存储知识）。FFN 是参数大头，将它稀疏化能得到最大的容量收益。</figcaption>
+        </figure>
 
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 替换FFN为MoE层的设计选择，决定了后续所有MoE-LLM工作的基本架构。Attention保持稠密、FFN变成稀疏——这种"半稀疏"设计在今天已经成为共识。有趣的是，2024年有些工作尝试把Attention也改造成稀疏的（如Sparse Attention + MoE），但效果不如"稠密Attention + 稀疏FFN"的组合。这说明Attention和FFN在Transformer中的"分工"是天然的：Attention负责"关系建模"（需要全局视野），FFN负责"知识存储"（可以专业化）。
@@ -156,6 +221,45 @@ def moe_transformer_layer(x, self_attention, moe_ffn, router, num_experts, k=2):
         </table>
 
         <p>其中，"专家坍缩"是MoE训练中最致命的问题——一旦某个专家完全得不到训练信号，它就沦为了"死参数"，浪费了存储空间和计算预算。论文给出了一个经验性的观察：<strong>训练的前几千步是决定专家能否"存活"的关键窗口</strong>。如果某个专家在训练初期从未被选中，它几乎不可能在后期"翻身"。</p>
+
+        <div class="moe-widget" id="collapse-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 8 个专家与 100 份 token 负载，切换三种路由状态，观察分布是否均衡以及哪些专家「死掉」。</p>
+            <div class="controls" role="group" aria-label="选择路由状态">
+                <button type="button" data-s="even" aria-pressed="true">均衡路由</button>
+                <button type="button" data-s="skew" aria-pressed="false">轻度不均衡</button>
+                <button type="button" data-s="collapse" aria-pressed="false">专家坍缩</button>
+            </div>
+            <p class="widget-output" aria-live="polite">均衡路由：8 个专家各获 12.5% 负载（各 12.5 份）；无空置专家。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('collapse-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var sets = {
+                even: [12.5,12.5,12.5,12.5,12.5,12.5,12.5,12.5],
+                skew: [30,24,18,12,8,5,2,1],
+                collapse: [62,30,8,0,0,0,0,0]
+            };
+            var names = { even: '均衡路由', skew: '轻度不均衡', collapse: '专家坍缩' };
+            function render(s) {
+                var a = sets[s], zero = 0, line = [];
+                for (var i = 0; i < a.length; i++) {
+                    line.push('专家 ' + (i + 1) + ' ' + a[i].toFixed(1) + '%');
+                    if (a[i] === 0) zero++;
+                }
+                out.textContent = names[s] + '：' + line.join('，') + '；空置专家 ' + zero + ' 个。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(this.getAttribute('data-s'));
+                });
+            }
+        })();
+        </script>
 
         <p>为了解决这个问题，论文采用了多重手段的组合：噪声让门控"被迫"尝试不同专家；辅助损失惩罚不均衡的门控决策；容量因子确保每个专家至少有一定的计算槽位。这在今天看来已经是MoE训练的"标准操作程序"了，但在2017年，这些经验是在大量失败的实验中摸索出来的。</p>
 
@@ -273,7 +377,18 @@ experimental_results = {
             <a href="index.html">📖 返回目录</a>
             <a href="06.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，ICLR 2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（§2.2 专家并行、§2.3 负载均衡、§5 实验）</li>
+                <li>Vaswani 等，<em>Attention Is All You Need</em>，2017。<a href="https://arxiv.org/abs/1706.03762">arXiv:1706.03762</a></li>
+                <li>Lepikhin 等，<em>GShard</em>，2020。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a></li>
+            </ol>
+            <p>「137B 参数、512 专家/层、4 个 MoE 层」及训练稳定性问题描述引自 Shazeer 等原文及仓内 <code>pdfs/02_Sparsely-Gated_MoE_2017_Shazeer.pdf</code>。代码块中的 <code>experimental_results</code> 已注明为<strong>抽象模拟值</strong>（教学示意），仅用于展示「参数量增长远快于算力增长」的相对趋势，不代表论文表中的精确数值；「学习率取 Dense 的 1/3–1/2」为<strong>教学经验</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

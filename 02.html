@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第2章 1991理论鼻祖：Adaptive Mixture of Local Experts</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第2章 1991 理论鼻祖：Adaptive Mixture of Local Experts</h1>
+            <p class="dek">逐字读一篇 1991 年的原始论文：门控网络如何用 softmax 给专家分配「责任权重」，以及这个稠密混合框架为何要等 26 年才真正迎来时代。</p>
+        </header>
 
         <h2>回到1991：一篇论文的诞生</h2>
 
@@ -64,6 +75,23 @@
         <p>门控网络的核心是一个 <strong>softmax 函数</strong>，它将每个专家的得分转化成一个概率分布。如果你熟悉今天的分类神经网络，这看起来平平无奇——但在1991年，softmax 作为"门控机制"出现在神经网络中，是一件非常有创意的事。</p>
 
         <p>论文中的门控输出可以用如下形式表达：</p>
+
+        <div class="math-equation" role="group" aria-label="门控责任权重公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="责任权重 softmax 公式，可横向滚动">
+                <math display="block" aria-label="第 i 个专家的责任权重 g_i 等于 exp 的 o_i 除以 j 从 1 到 E 的 exp 的 o_j 之和">
+                    <mrow>
+                        <msub><mi>g</mi><mi>i</mi></msub><mo>=</mo>
+                        <mfrac>
+                            <mrow><mi>exp</mi><mo stretchy="false">(</mo><msub><mi>o</mi><mi>i</mi></msub><mo stretchy="false">)</mo></mrow>
+                            <mrow><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>E</mi></munderover><mi>exp</mi><mo stretchy="false">(</mo><msub><mi>o</mi><mi>j</mi></msub><mo stretchy="false">)</mo></mrow>
+                        </mfrac>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="o_i 是门控网络对第 i 个专家的原始打分"><msub><mi>o</mi><mi>i</mi></msub></math>
+            是门控网络对第 <math class="math-inline" aria-label="i"><mi>i</mi></math> 个专家的原始打分，所有 <math class="math-inline" aria-label="g_i 之和为 1"><msub><mi>g</mi><mi>i</mi></msub></math> 之和恒为 1。注意这里没有 top-k——每个专家都拿到一个（可能很小的）非零权重。</p>
 
         <pre><code># 1991年Jacobs论文的MoE前向计算（Python化伪码）
 import numpy as np
@@ -88,6 +116,77 @@ def moe_forward_jacobs(x, experts, gate):
     return output</code></pre>
 
         <p>注意看上面代码的第3步：<strong>所有专家的输出都参与加权求和</strong>，只是权重由门控网络决定。这与今天稀疏MoE的"只激活top-k个专家"完全不同。1991年的MoE是<strong>稠密混合</strong>，2017年之后的MoE是<strong>稀疏激活</strong>。这个区别我们后面会详细展开。</p>
+
+        <figure>
+            <svg viewBox="0 0 860 320" role="img" aria-labelledby="fig-j1991-title fig-j1991-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-j1991-title">1991 年稠密混合 MoE 的数据流</title>
+                <desc id="fig-j1991-desc">输入 x 送入门控网络，经 softmax 得到各专家责任权重 g1、g2、g3；三个专家的输出全部计算，再按权重加权求和得到输出 y。所有专家都参与前向。</desc>
+                <rect x="20" y="138" width="80" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="166" font-size="15" text-anchor="middle" fill="#7c2d12">输入 x</text>
+                <path d="M102 160 h38" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M144 154 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="152" y="116" width="140" height="88" rx="14" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="222" y="152" font-size="15" text-anchor="middle" fill="#4c1d95">门控网络</text>
+                <text x="222" y="176" font-size="14" text-anchor="middle" fill="#6d28d9">softmax → g</text>
+                <g stroke="#94a3b8" stroke-width="1.6" fill="none">
+                    <path d="M294 140 C360 80 372 74 404 74"/>
+                    <path d="M294 160 H404"/>
+                    <path d="M294 180 C360 240 372 246 404 246"/>
+                </g>
+                <g font-size="13" fill="#6d28d9">
+                    <text x="330" y="92">g1</text><text x="338" y="155">g2</text><text x="330" y="230">g3</text>
+                </g>
+                <g font-size="14">
+                    <rect x="406" y="46" width="130" height="56" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="471" y="80" text-anchor="middle" fill="#3730a3">专家 1</text>
+                    <rect x="406" y="132" width="130" height="56" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="471" y="166" text-anchor="middle" fill="#3730a3">专家 2</text>
+                    <rect x="406" y="218" width="130" height="56" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="471" y="252" text-anchor="middle" fill="#3730a3">专家 3</text>
+                </g>
+                <g stroke="#94a3b8" stroke-width="1.6" fill="none">
+                    <path d="M538 74 C600 74 612 150 640 160"/>
+                    <path d="M538 160 H640"/>
+                    <path d="M538 246 C600 246 612 170 640 160"/>
+                </g>
+                <circle cx="668" cy="160" r="28" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <text x="668" y="168" font-size="20" text-anchor="middle" fill="#0f4c4a">Σ</text>
+                <path d="M698 160 h34" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M736 154 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="746" y="138" width="94" height="44" rx="10" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="793" y="166" font-size="15" text-anchor="middle" fill="#14532d">输出 y</text>
+                <text x="30" y="300" font-size="14" fill="#7c2d12">箭头均接通：三个专家全部执行前向，权重小 ≠ 不计算</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 1991 年的稠密混合：门控只改变加权系数，三个专家都会被执行；权重接近 0 的专家依旧消耗全部计算。稀疏化要等到 2017 年才把「权重 ≈ 0」变成「干脆不算」。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="mix-demo">
+            <p class="widget-q"><strong>交互：</strong>同样 8 个专家、同样一组门控权重，切换 1991 稠密混合与 2017 稀疏 Top-2，比较真正参与前向的专家数量。</p>
+            <div class="controls" role="group" aria-label="选择混合方式">
+                <button type="button" data-mode="dense" aria-pressed="true">1991 稠密混合</button>
+                <button type="button" data-mode="sparse" aria-pressed="false">2017 稀疏 Top-2</button>
+            </div>
+            <p class="widget-output" aria-live="polite">稠密混合：8 个专家的输出全部参与加权求和（8/8 被执行），权重 g 由 softmax 给出。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('mix-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var btns = root.querySelectorAll('button');
+            var text = {
+                dense: '稠密混合：8 个专家的输出全部参与加权求和（8/8 被执行），权重 g 由 softmax 给出。',
+                sparse: '稀疏 Top-2：只执行 2/8 个专家（约 25% 专家算力），其余 6 个专家的前向被完全跳过，梯度也不流经它们。'
+            };
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = text[this.getAttribute('data-mode')];
+                });
+            }
+        })();
+        </script>
 
         <p>论文最精妙的设计在于<strong>训练方法</strong>：专家网络和门控网络不是分开训练的，而是通过端到端的梯度下降联合训练。门控网络通过增大"正确"专家的权重、减小"错误"专家的权重，来学习如何分配责任。而专家网络则通过加权后的误差信号来更新自己的参数——权重高的专家收到更强的训练信号，权重低的专家收到的信号很弱。这种机制自然导致了<strong>竞争性学习</strong>：每个专家都争取在门控网络那里获得更高的权重分配。</p>
 
@@ -199,7 +298,17 @@ def sparse_moe_forward(x, experts, gate, k=2):
             <a href="index.html">📖 返回目录</a>
             <a href="03.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jacobs, Jordan, Hinton 等，<em>Adaptive Mixture of Local Experts</em>，Neural Computation，1991。<a href="https://doi.org/10.1162/neco.1991.3.1.79">doi:10.1162/neco.1991.3.1.79</a></li>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a></li>
+            </ol>
+            <p>本章对 1991 年架构的复原以 Jacobs 等原文及仓内 <code>pdfs/01_Adaptive_Mixture_of_Local_Experts_1991_Jacobs.pdf</code> 为准。正文中的项目经验故事与「64 专家速度变慢 50 倍」等数字为<strong>教学示意</strong>（已作简化），用于说明稠密混合的工程代价，非论文实测数据。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

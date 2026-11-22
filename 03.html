@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第3章 条件计算与稀疏激活原理</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第3章 条件计算与稀疏激活原理</h1>
+            <p class="dek">为什么「不计算」比「计算」更值钱：从条件计算的定义出发，推导稀疏激活如何把知识容量与推理算力解耦。</p>
+        </header>
 
         <h2>当"不计算"比"计算"更重要</h2>
 
@@ -114,6 +125,20 @@ def conditional_forward(x, router, experts, k=2):
 
         <p>一个标准Transformer FFN的计算量为：</p>
 
+        <div class="math-equation" role="group" aria-label="MoE 每 token 计算量公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="MoE 每 token 计算量公式，可横向滚动">
+                <math display="block" aria-label="MoE 每 token 计算量约等于 k 乘以 4 乘以 d 乘以 d_ff">
+                    <mrow>
+                        <msub><mi>FLOPs</mi><mrow><mi>MoE</mi></mrow></msub>
+                        <mo>≈</mo>
+                        <mi>k</mi><mo>·</mo><mn>4</mn><mi>d</mi><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中单专家 FFN 的计算量为 <math class="math-inline" aria-label="4 乘以 d 乘以 d_ff"><mn>4</mn><mi>d</mi><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub></math>（两个矩阵乘各占 <math class="math-inline" aria-label="2 乘以 d 乘以 d_ff"><mn>2</mn><mi>d</mi><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub></math>，<math class="math-inline" aria-label="d_ff 为 FFN 内部维度"><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub></math> 通常为 <math class="math-inline" aria-label="d 的 4 倍"><mn>4</mn><mi>d</mi></math>），路由打分的计算量远小于专家本体，故可忽略。因此总参数量正比于 <math class="math-inline" aria-label="E"><mi>E</mi></math>，而每 token 计算量只正比于 <math class="math-inline" aria-label="k"><mi>k</mi></math>。</p>
+
         <pre><code># Dense FFN 的 FLOPs 计算（以单个token为例）
 # FFN包含两个线性变换，中间有激活函数
 # 第一层: d -> d_ff, 计算量 = 2 * d * d_ff
@@ -184,6 +209,89 @@ dense_flops = 4 * 4096 * 16384   # ≈ 268M FLOPs per token
         </table>
 
         <p>看到表格中醒目的"64x"了吗？MoE在最理想的情况下，可以用2倍的计算开销换取64倍的知识容量——这个"性价比"是Dense架构完全无法企及的。当然，实际中由于通信开销、负载均衡损失、路由效率等因素，这个倍数会有折扣，但数量级上的优势是确定的。</p>
+
+        <figure>
+            <svg viewBox="0 0 880 360" role="img" aria-labelledby="fig-cond-title fig-cond-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-cond-title">无条件计算与条件计算的计算图对比</title>
+                <desc id="fig-cond-desc">上排无条件（Dense）计算：输入 x 直接进入全部 5 个专家块，每块都执行。下排条件计算（MoE）：输入 x 先经过路由器，只有 2 个专家块被激活，其余 3 个被跳过（虚线）。</desc>
+                <rect x="20" y="46" width="80" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="74" font-size="15" text-anchor="middle" fill="#7c2d12">输入 x</text>
+                <text x="120" y="30" font-size="15" font-weight="700" fill="#1e1b4b">无条件计算（Dense）：全部执行</text>
+                <g font-size="13">
+                    <rect x="300" y="36" width="98" height="64" rx="10" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="349" y="74" text-anchor="middle" fill="#3730a3">块 1</text>
+                    <rect x="418" y="36" width="98" height="64" rx="10" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="467" y="74" text-anchor="middle" fill="#3730a3">块 2</text>
+                    <rect x="536" y="36" width="98" height="64" rx="10" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="585" y="74" text-anchor="middle" fill="#3730a3">块 3</text>
+                    <rect x="654" y="36" width="98" height="64" rx="10" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="703" y="74" text-anchor="middle" fill="#3730a3">块 4</text>
+                    <rect x="772" y="36" width="98" height="64" rx="10" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                    <text x="821" y="74" text-anchor="middle" fill="#3730a3">块 5</text>
+                </g>
+                <path d="M102 68 H292" stroke="#94a3b8" stroke-width="1.6"/>
+                <text x="120" y="210" font-size="15" font-weight="700" fill="#1e1b4b">条件计算（MoE）：只走 2 条支路</text>
+                <rect x="20" y="226" width="80" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="254" font-size="15" text-anchor="middle" fill="#7c2d12">输入 x</text>
+                <rect x="140" y="224" width="110" height="48" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="195" y="254" font-size="14" text-anchor="middle" fill="#4c1d95">Router</text>
+                <path d="M102 248 h34" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M250 248 h42" stroke="#94a3b8" stroke-width="1.6"/>
+                <g font-size="13">
+                    <rect x="300" y="216" width="98" height="64" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="6 4"/>
+                    <text x="349" y="254" text-anchor="middle" fill="#94a3b8">跳过</text>
+                    <rect x="418" y="216" width="98" height="64" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="467" y="254" text-anchor="middle" fill="#0f4c4a" font-weight="700">激活 ✓</text>
+                    <rect x="536" y="216" width="98" height="64" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="6 4"/>
+                    <text x="585" y="254" text-anchor="middle" fill="#94a3b8">跳过</text>
+                    <rect x="654" y="216" width="98" height="64" rx="10" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="703" y="254" text-anchor="middle" fill="#0f4c4a" font-weight="700">激活 ✓</text>
+                    <rect x="772" y="216" width="98" height="64" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="6 4"/>
+                    <text x="821" y="254" text-anchor="middle" fill="#94a3b8">跳过</text>
+                </g>
+                <text x="300" y="312" font-size="14" fill="#0f4c4a">只有 2/5 个块被真正执行：FLOPs 正比于 k，而非 E</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 条件计算与无条件计算的计算图差异。Dense 中每个输入都遍历全部专家块；MoE 中路由器先在传播前决定路径，被跳过的块不消耗 FLOPs——这与 ReLU 输出 0 仍算完矩阵乘不同。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="sparse-ratio">
+            <p class="widget-q"><strong>交互：</strong>固定单专家参数量，调整专家总数 E 与每 token 激活数 k，观察「总参数 / 活跃参数」比例的变化。</p>
+            <div class="controls" role="group" aria-label="专家总数 E">
+                <button type="button" data-e="8" aria-pressed="false">E=8</button>
+                <button type="button" data-e="64" aria-pressed="true">E=64</button>
+                <button type="button" data-e="256" aria-pressed="false">E=256</button>
+            </div>
+            <div class="controls" role="group" aria-label="激活专家数 k">
+                <button type="button" data-k="1" aria-pressed="false">k=1</button>
+                <button type="button" data-k="2" aria-pressed="true">k=2</button>
+                <button type="button" data-k="8" aria-pressed="false">k=8</button>
+            </div>
+            <p class="widget-output" aria-live="polite">E=64, k=2：总参数 = 64 × 单专家参数，活跃参数 = 2 × 单专家参数，比值 32:1。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('sparse-ratio');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var state = { e: 64, k: 2 };
+            function render() {
+                out.textContent = 'E=' + state.e + ', k=' + state.k + '：总参数 = ' + state.e + ' × 单专家参数，活跃参数 = ' +
+                    state.k + ' × 单专家参数，比值 ' + (state.e / state.k).toFixed(0) + ':1。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    var g = this.parentNode, sib = g.querySelectorAll('button');
+                    for (var j = 0; j < sib.length; j++) sib[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    if (this.hasAttribute('data-e')) state.e = parseInt(this.getAttribute('data-e'), 10);
+                    else state.k = parseInt(this.getAttribute('data-k'), 10);
+                    render();
+                });
+            }
+            render();
+        })();
+        </script>
 
         <div class="warning">
             <strong>⚠️ 实战要点：</strong> 稀疏激活的"算力节省"是有代价的。首先，虽然每token的FLOPs只有2x Dense，但<strong>显存占用是65x</strong>——因为你必须把全部64个专家参数加载到显存中（无论它们是否被激活）。这就是为什么MoE模型通常需要多机分布式部署，单卡根本放不下。我在第一次部署MoE推理服务时就被这个"隐形成本"坑了——只算了FLOPs，没算显存，结果模型加载就直接OOM了。
@@ -287,7 +395,18 @@ FLOPs每token ≈ k × 4 × d × d_ff  # 只计算k个专家的前向传播
             <a href="index.html">📖 返回目录</a>
             <a href="04.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Bengio, Léonard, Courville，<em>Estimating or Propagating Gradients Through Stochastic Neurons for Conditional Computation</em>，2013。<a href="https://arxiv.org/abs/1306.2795">arXiv:1306.2795</a></li>
+                <li>Jacobs, Jordan, Hinton 等，<em>Adaptive Mixture of Local Experts</em>，Neural Computation，1991。<a href="https://doi.org/10.1162/neco.1991.3.1.79">doi:10.1162/neco.1991.3.1.79</a></li>
+                <li>Fedus, Dean, Zoph，<em>A Review of Sparse Expert Models in Deep Learning</em>，2022。<a href="https://arxiv.org/abs/2202.09368">arXiv:2202.09368</a></li>
+            </ol>
+            <p>本章的 FLOPs 与参数量换算式子可由 <math class="math-inline" aria-label="4 乘以 d 乘以 d_ff"><mn>4</mn><mi>d</mi><msub><mi>d</mi><mrow><mi>ff</mi></mrow></msub></math> 直接验算（已作简化，忽略偏置与激活函数）。文中「人脑仅 1–4% 神经元同时活跃」为<strong>教学示意</strong>，用于类比「大储备、局部激活」，并非本节引文中的定量结论；「64 专家稠密训练慢 50 倍」同属教学示意。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
