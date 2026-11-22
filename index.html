@@ -271,17 +271,72 @@
     </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至课程目录</a>
 <div class="container">
-    <div class="header">
-        <h1><span class="emoji"></span><span class="title-text"></span></h1>
-        <div class="sub"></div>
-    </div>
+    <header class="header">
+        <h1><span class="emoji">🤖</span><span class="title-text">MoE混合专家模型 · 从入门到精通</span></h1>
+        <div class="sub">📘 28章 实战体系</div>
+    </header>
 
+    <nav aria-label="页面内导航">
+        <a href="#roadmap-h">学习路径</a> · <a href="#catalog-h">章节目录</a>
+    </nav>
+
+    <main id="content"><article>
+    <h2 id="roadmap-h">学习路径</h2>
+    <p>本课程沿着 MoE 的发展脉络组织：先讲清 1991 年的理论鼻祖与 2017 年的稀疏化转折，再进入路由、负载均衡与分布式工程，随后沿开源工业主线走到 2025–26 年前沿，最后以从零实现与综合项目收束。下图给出七阶段划分与对应的章节区间。</p>
+
+    <figure>
+        <svg viewBox="0 0 900 300" role="img" aria-labelledby="fig-roadmap-title fig-roadmap-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+            <title id="fig-roadmap-title">MoE 课程七阶段学习路径</title>
+            <desc id="fig-roadmap-desc">七个阶段自左向右、自上而下排列：理念与起源（第1至5章）、路由与均衡（第6至8章）、工程基座（第9至10章）、开源明星（第11至15章）、路由深论（第16至20章）、前沿与推理（第21至25章）、实战（第26至28章）。</desc>
+            <g stroke="none">
+                <rect x="20" y="30" width="190" height="86" rx="14" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <rect x="240" y="30" width="190" height="86" rx="14" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <rect x="460" y="30" width="190" height="86" rx="14" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <rect x="680" y="30" width="200" height="86" rx="14" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <rect x="20" y="170" width="190" height="86" rx="14" fill="#faf5ff" stroke="#7c3aed" stroke-width="2"/>
+                <rect x="240" y="170" width="190" height="86" rx="14" fill="#fef2f2" stroke="#b91c1c" stroke-width="2"/>
+                <rect x="460" y="170" width="420" height="86" rx="14" fill="#f8fafc" stroke="#334155" stroke-width="2"/>
+            </g>
+            <g fill="#1e1b4b" font-size="19" font-weight="700">
+                <text x="36" y="66">理念与起源</text>
+                <text x="256" y="66">路由与均衡</text>
+                <text x="476" y="66">工程基座</text>
+                <text x="696" y="66">开源明星</text>
+                <text x="36" y="206">路由深论</text>
+                <text x="256" y="206">前沿 + 推理</text>
+                <text x="476" y="206">实战收束</text>
+            </g>
+            <g fill="#475569" font-size="15">
+                <text x="36" y="94">第 1–5 章</text>
+                <text x="256" y="94">第 6–8 章</text>
+                <text x="476" y="94">第 9–10 章</text>
+                <text x="696" y="94">第 11–15 章</text>
+                <text x="36" y="234">第 16–20 章</text>
+                <text x="256" y="234">第 21–25 章</text>
+                <text x="476" y="234">第 26–28 章</text>
+            </g>
+            <g stroke="#94a3b8" stroke-width="2" fill="none" marker-end="none">
+                <path d="M212 73 h24"/><path d="M432 73 h24"/><path d="M652 73 h24"/>
+                <path d="M212 213 h24"/>
+                <path d="M660 116 v44"/>
+            </g>
+            <g fill="#94a3b8" font-size="20">
+                <text x="216" y="80">›</text><text x="436" y="80">›</text><text x="656" y="80">›</text>
+                <text x="216" y="220">›</text>
+            </g>
+        </svg>
+        <figcaption><span class="fig-num">图 1</span> 课程按 MoE 发展脉络组织的七阶段学习路径。阶段与章节的对应关系取自本项目 <code>courses.json</code> 中的阶段映射，可逐章核对。</figcaption>
+    </figure>
+
+    <h2 id="catalog-h">章节目录</h2>
     <div id="cardContainer" class="course-grid"></div>
 
     <div style="text-align:center;">
-        <div class="footer"></div>
+        <div class="footer"><span>28章</span> 实战体系 · 从入门到精通</div>
     </div>
+    </article></main>
 </div>
 
 <script>

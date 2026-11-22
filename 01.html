@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第1章 MoE概述与演进史</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        /* 关键布局守卫：即使外部样式未加载，代码块与图也不会撑破窄屏 */
+        pre { max-width: 100%; overflow-x: auto; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html" class="active">第1章 MoE概述与演进史</a></li>
@@ -41,8 +48,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1 id="chapter-title">第1章 MoE 概述与演进史</h1>
+            <p class="dek">从「分而治之、按需调用」的直觉出发，理解混合专家模型为何能在参数规模与计算成本之间解耦，并沿 1991→2026 的时间线建立全课程的概念坐标。</p>
+        </header>
 
         <h2>欢迎来到MoE的世界</h2>
 
@@ -93,6 +104,111 @@ def moe_forward(x, experts, router):
         <div class="tip">
             <strong>💡 理解关键：</strong> 一个 8×专家 的 MoE 层，如果采用 top-2 路由，意味着每层虽然有 8 组 FFN 参数，但每个 token 只激活其中 2 组。总参数量约为 dense 模型的 8 倍，但计算量仅约 2 倍。这就是 MoE 能在相同 FLOPs 预算下塞入更多参数的核心秘密。
         </div>
+
+        <p>把上面的伪代码写成公式，一个 MoE 层的输出就是对所有专家输出的加权求和，其中只有被选中的 top-k 个专家权重非零：</p>
+
+        <div class="math-equation" role="group" aria-label="MoE 层前向输出公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="MoE 输出公式，可横向滚动">
+                <math display="block" aria-label="MoE 层输出 y 等于从 i 到 E 求和的 g_i 乘以 x 乘以 E_i 乘以 x">
+                    <mrow>
+                        <mi>y</mi><mo>=</mo>
+                        <munderover>
+                            <mo>∑</mo>
+                            <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow>
+                            <mi>E</mi>
+                        </munderover>
+                        <msub><mi>g</mi><mi>i</mi></msub>
+                        <mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                        <msub><mi>E</mi><mi>i</mi></msub>
+                        <mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中第 <math class="math-inline" aria-label="i"><mi>i</mi></math> 个专家的门控权重为
+            <math class="math-inline" aria-label="g_i 等于 softmax 作用于保留 top-k 之后的 H 的第 i 个分量">
+                <msub><mi>g</mi><mi>i</mi></msub><mo>=</mo><mi>Softmax</mi><mo stretchy="false">(</mo><mi>H</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+                <msub><mo stretchy="false">)</mo><mi>i</mi></msub>
+            </math>
+            ，而 <math class="math-inline" aria-label="H 是门控网络的原始对数"><mi>H</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></math>
+            是路由网络的原始打分；未被选中的专家权重为 0，因此可以跳过一次完整的前向计算。
+        </p>
+
+        <figure>
+            <svg viewBox="0 0 900 360" role="img" aria-labelledby="fig-sparse-title fig-sparse-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-sparse-title">稠密 FFN 与 8 专家 Top-2 MoE 的激活对比</title>
+                <desc id="fig-sparse-desc">左侧稠密 FFN：每个 token 激活整块 FFN 的全部参数。右侧 8 专家 MoE：token 先经过 Router，再只激活 8 个专家中的 2 个（实心深色），其余 6 个不参与计算。</desc>
+                <text x="30" y="30" font-size="17" font-weight="700" fill="#1e1b4b">稠密 FFN：全参数激活</text>
+                <text x="470" y="30" font-size="17" font-weight="700" fill="#1e1b4b">MoE（8 专家 · Top-2）</text>
+                <rect x="30" y="150" width="100" height="46" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="80" y="179" font-size="15" text-anchor="middle" fill="#7c2d12">token x</text>
+                <path d="M132 173 h56" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M184 167 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="196" y="70" width="190" height="206" rx="14" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="291" y="160" font-size="15" text-anchor="middle" fill="#3730a3">FFN</text>
+                <text x="291" y="186" font-size="14" text-anchor="middle" fill="#475569">全部参数参与计算</text>
+                <text x="291" y="258" font-size="14" text-anchor="middle" fill="#7c2d12">激活 100%</text>
+                <rect x="470" y="150" width="96" height="46" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="518" y="179" font-size="15" text-anchor="middle" fill="#7c2d12">token x</text>
+                <path d="M568 173 h44" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M616 167 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="628" y="148" width="82" height="50" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="669" y="179" font-size="15" text-anchor="middle" fill="#4c1d95">Router</text>
+                <path d="M712 173 h30" stroke="#94a3b8" stroke-width="2"/>
+                <g font-size="14">
+                    <rect x="748" y="16" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="36" text-anchor="middle" fill="#475569">专家 1</text>
+                    <rect x="748" y="54" width="140" height="30" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="818" y="74" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 2 ✓</text>
+                    <rect x="748" y="92" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="112" text-anchor="middle" fill="#475569">专家 3</text>
+                    <rect x="748" y="130" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="150" text-anchor="middle" fill="#475569">专家 4</text>
+                    <rect x="748" y="168" width="140" height="30" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="818" y="188" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 5 ✓</text>
+                    <rect x="748" y="206" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="226" text-anchor="middle" fill="#475569">专家 6</text>
+                    <rect x="748" y="244" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="264" text-anchor="middle" fill="#475569">专家 7</text>
+                    <rect x="748" y="282" width="140" height="30" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                    <text x="818" y="302" text-anchor="middle" fill="#475569">专家 8</text>
+                </g>
+                <text x="748" y="338" font-size="14" fill="#0f4c4a">仅 2/8 专家亮起：激活 25% 专家参数</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 同样的输入下，稠密 FFN 激活整块参数，而 Top-2 MoE 只激活 8 个专家中的 2 个（高亮）。总参数量随专家数增长，单 token 计算量只随 k 增长——这正是「参数多、计算少」的几何来源。</figcaption>
+        </figure>
+
+        <div class="moe-widget" id="route-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 8 个专家，切换每个 token 激活的专家个数 Top-k，观察激活参数比例与计算量随 k 的变化。</p>
+            <div class="controls" role="group" aria-label="选择 Top-k">
+                <button type="button" data-k="1" aria-pressed="false">Top-1</button>
+                <button type="button" data-k="2" aria-pressed="true">Top-2</button>
+                <button type="button" data-k="4" aria-pressed="false">Top-4</button>
+            </div>
+            <p class="widget-output" aria-live="polite">Top-2：每个 token 激活 8 个专家中的 2 个（25.0% 专家参数）；总参数量 ≈ 8 × 单专家 FFN，单 token 计算量 ≈ 2 × 单专家 FFN。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('route-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var btns = root.querySelectorAll('button');
+            function render(k) {
+                var pct = (k / 8 * 100).toFixed(1);
+                out.textContent = 'Top-' + k + '：每个 token 激活 8 个专家中的 ' + k + ' 个（' + pct +
+                    '% 专家参数）；总参数量 ≈ 8 × 单专家 FFN，单 token 计算量 ≈ ' + k + ' × 单专家 FFN。';
+            }
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseInt(this.getAttribute('data-k'), 10));
+                });
+            }
+            render(2);
+        })();
+        </script>
 
         <p>这种"参数多、计算少"的特性，让MoE在大型语言模型时代获得了前所未有的关注。在Transformer架构中，MoE通常替换掉FFN子层，保留Self-Attention结构不变。这样一来，Attention部分依旧是全参数计算，但FFN部分实现了稀疏化，整体计算量大幅下降。</p>
 
@@ -315,7 +431,20 @@ def moe_forward(x, experts, router):
             <a href="index.html">📖 返回目录</a>
             <a href="02.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jacobs, Jordan, Hinton 等，<em>Adaptive Mixture of Local Experts</em>，Neural Computation，1991。<a href="https://doi.org/10.1162/neco.1991.3.1.79">doi:10.1162/neco.1991.3.1.79</a></li>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a></li>
+                <li>Fedus 等，<em>Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a></li>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a></li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a></li>
+            </ol>
+            <p>本节事实与指标以上述论文及仓内 <code>pdfs/</code> 对应的原始文献为准。正文中出现的教学性估算——例如「推理效率提升 5–10 倍」与 Dense 万亿参数部署困境的例子——均为<strong>教学示意</strong>（已作简化），用于说明量级差异，不代表论文实测值；DeepSeek-V3 的 671B 总参 / 37B 活跃参及 $5.576M 训练成本则来自其技术报告。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

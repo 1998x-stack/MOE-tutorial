@@ -156,3 +156,95 @@ th {
     body { padding: 10px; }
     .main-content { padding: 20px; }
 }
+
+/* === Article components: figures, math, interactive, notes === */
+.skip-link {
+    position: absolute; left: -9999px; top: 0; z-index: 100;
+    background: #4c1d95; color: #fff; padding: 10px 16px; border-radius: 0 0 12px 0;
+    text-decoration: none; font-weight: 600;
+}
+.skip-link:focus { left: 0; }
+
+.article-header { margin-bottom: 1.5rem; }
+.article-header h1 {
+    font-size: clamp(1.65rem, 1.2rem + 1.8vw, 2.35rem);
+    line-height: 1.25; color: #4c1d95; margin: 0 0 0.6rem;
+    letter-spacing: -0.01em;
+}
+.article-header .dek { font-size: 1.02rem; color: #475569; line-height: 1.75; margin: 0; }
+
+figure {
+    margin: 1.6rem 0; padding: 1rem 1rem 0.6rem;
+    background: #fbfaff; border: 1px solid #ddd6fe; border-radius: 18px;
+}
+figure svg { width: 100%; height: auto; max-width: 100%; display: block; }
+figcaption { font-size: 0.9rem; color: #475569; margin-top: 0.6rem; line-height: 1.65; }
+figcaption .fig-num { font-weight: 700; color: #6d28d9; }
+
+/* MathML */
+.math-inline { font-family: "Cambria Math","STIX Two Math","Latin Modern Math",serif; }
+.math-equation { max-width: 100%; min-width: 0; margin: 1.2rem 0; }
+.math-scroll {
+    max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden;
+    padding: 0.5rem 0.25rem; background: #faf8ff; border-radius: 12px;
+}
+.math-scroll:focus-visible { outline: 3px solid #7c3aed; outline-offset: 2px; }
+.math-scroll math[display="block"] {
+    width: max-content; min-width: 100%; font-size: 1.2rem; margin: 0 auto;
+}
+
+/* Interactive widgets */
+.moe-widget {
+    margin: 1.5rem 0; padding: 1rem 1.1rem; border-radius: 18px;
+    background: #f5f3ff; border: 1px solid #c4b5fd;
+}
+.moe-widget .widget-q { margin: 0 0 0.7rem; }
+.moe-widget .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.7rem; }
+.moe-widget button {
+    cursor: pointer; font: inherit; font-weight: 600; font-size: 0.88rem;
+    color: #4c1d95; background: #fff; border: 1px solid #8b5cf6;
+    border-radius: 999px; padding: 0.35rem 1rem; transition: background 0.15s, color 0.15s;
+}
+.moe-widget button:hover { background: #ede9fe; }
+.moe-widget button[aria-pressed="true"] { background: #7c3aed; color: #fff; }
+.moe-widget .widget-output {
+    margin: 0; font-family: 'JetBrains Mono','Fira Code',monospace;
+    font-size: 0.9rem; line-height: 1.7; color: #1e1b4b;
+    background: #fff; border-radius: 12px; padding: 0.7rem 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+/* Teaching / simplification notes (real article content) */
+.note-teaching {
+    padding: 12px 18px; border-radius: 16px; margin: 15px 0; line-height: 1.7;
+    background: #fff7ed; border-left: 6px solid #f59e0b; color: #7c2d12;
+}
+
+/* References */
+.references { margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid #ddd6fe; }
+.references h2 { margin-top: 0; }
+.references ol { margin-left: 1.2rem; }
+.references li { margin-bottom: 0.5rem; line-height: 1.7; }
+.references a { color: #6d28d9; text-decoration: underline; overflow-wrap: anywhere; }
+
+:focus-visible { outline: 3px solid #7c3aed; outline-offset: 2px; }
+
+@media (max-width: 480px) {
+    .main-content { padding: 16px; }
+    figure { padding: 0.7rem 0.7rem 0.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+    .chapter-list a:hover, .footer-nav a:hover, .card:hover { transform: none !important; }
+}
+
+@media print {
+    .sidebar, .skip-link, .moe-widget .controls, .card-footer a { display: none !important; }
+    .double-border { border: none; box-shadow: none; }
+    .container { display: block; }
+    .math-scroll { overflow: visible; }
+    .math-scroll math[display="block"] { font-size: 1rem; }
+    figure { break-inside: avoid; }
+    a { color: #4c1d95; }
+}
