@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第26章 MoE训练实战：从零搭建稀疏模型</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第26章 MoE 训练实战：从零搭建稀疏模型</h1>
+            <p class="dek">动手写一个 MoE 层：门控、专家与稀疏聚合；再认识工业框架（Megablocks / Tutel）与调参、监控、收敛性的一套实战经验。</p>
+        </header>
 
         <h2>欢迎来到实战环节</h2>
 
@@ -51,6 +63,50 @@
         <p>说实话，理论学习和动手实战之间有一条不小的鸿沟。你可能已经把路由公式、负载均衡策略背得滚瓜烂熟，但一旦打开VS Code开始写训练脚本，却发现连一个简单的MoE层都跑不通——权重不收敛、显存OOM、专家全部坍缩……这些问题我全都经历过。学MoE的最好方式就是亲手摔几跤，然后爬起来的每个跟头都会让你对原理的理解更深一层。这一章，我就带你走一遍从零实现MoE训练的全流程，把那些坑一个一个填平。</p>
 
         <h2>从零实现一个MoE层</h2>
+
+        <p>一个最小可用的 MoE 训练回路包括前向、三个损失项与反向：</p>
+
+        <figure>
+            <svg viewBox="0 0 840 330" role="img" aria-labelledby="fig-train-title fig-train-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-train-title">MoE 训练前向与三部分损失</title>
+                <desc id="fig-train-desc">token 经路由器选 Top-K 专家，专家输出加权汇总后送入 LM 头得到语言建模损失 L_lm；路由统计（负载与 logits）另外产生负载均衡损失 L_aux 与 Z-loss L_z，三者相加后反向传播。</desc>
+                <rect x="20" y="120" width="80" height="50" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
+                <text x="60" y="150" font-size="13" text-anchor="middle" fill="#7c2d12">token x</text>
+                <path d="M102 145 h22" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M128 139 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="138" y="110" width="110" height="70" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="193" y="150" font-size="13" text-anchor="middle" fill="#4c1d95">Router</text>
+                <path d="M250 145 h26" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M280 139 l10 6 -10 6 z" fill="#94a3b8"/>
+                <g font-size="12">
+                    <rect x="290" y="46" width="150" height="40" rx="8" fill="#e2e8f0" stroke="#94a3b8"/>
+                    <text x="365" y="71" text-anchor="middle" fill="#475569">专家 1</text>
+                    <rect x="290" y="98" width="150" height="40" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="365" y="123" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 2 ✓</text>
+                    <rect x="290" y="150" width="150" height="40" rx="8" fill="#d7f2ef" stroke="#147f80" stroke-width="2.5"/>
+                    <text x="365" y="175" text-anchor="middle" fill="#0f4c4a" font-weight="700">专家 3 ✓</text>
+                    <rect x="290" y="202" width="150" height="40" rx="8" fill="#e2e8f0" stroke="#94a3b8"/>
+                    <text x="365" y="227" text-anchor="middle" fill="#475569">… 专家 E</text>
+                </g>
+                <path d="M444 145 h26" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M474 139 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="484" y="118" width="120" height="54" rx="12" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="544" y="150" font-size="13" text-anchor="middle" fill="#3730a3">加权汇总</text>
+                <path d="M606 145 h26" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M636 139 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="646" y="118" width="170" height="54" rx="12" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="731" y="150" font-size="13" text-anchor="middle" fill="#14532d">LM 头 → L_lm</text>
+                <rect x="290" y="264" width="300" height="50" rx="12" fill="#fef9c3" stroke="#facc15" stroke-width="2"/>
+                <text x="440" y="295" font-size="12" text-anchor="middle" fill="#713f12">路由统计（负载、logits）→ L_aux、L_z</text>
+                <path d="M590 289 h40" stroke="#94a3b8" stroke-width="1.6"/>
+                <path d="M634 283 l10 6 -10 6 z" fill="#94a3b8"/>
+                <rect x="646" y="238" width="170" height="60" rx="12" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
+                <text x="731" y="264" font-size="12" text-anchor="middle" fill="#991b1b">总损失</text>
+                <text x="731" y="284" font-size="11" text-anchor="middle" fill="#991b1b">L_lm+αL_aux+βL_z</text>
+                <text x="20" y="310" font-size="12" fill="#475569">三个损失项共同反向传播，只更新被激活的专家与路由器。</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 一个教学级 MoE 训练回路：前向只走 Top-K 专家；反向时除了语言建模损失 <math class="math-inline" aria-label="L_lm"><msub><mi>L</mi><mrow><mi>lm</mi></mrow></msub></math>，还叠加负载均衡与 Z-loss 两项稳定训练。</figcaption>
+        </figure>
 
         <p>我们先从最基础的PyTorch实现开始。一个标准的MoE层包含三个部分：门控网络（Router）、专家网络列表（Experts）、以及稀疏聚合逻辑。下面这个实现虽然简单，但包含了MoE层的所有核心要素：</p>
 
@@ -189,6 +245,23 @@ class MegablocksMoE(nn.Module):
 
         <h2>训练调参与踩坑实录</h2>
 
+        <p>综合本章的经验，推荐的总损失由三部分组成：</p>
+
+        <div class="math-equation" role="group" aria-label="MoE 训练总损失">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="总损失公式，可横向滚动">
+                <math display="block" aria-label="总损失等于语言建模损失 L_lm 加上 alpha 乘负载均衡损失 L_aux 加 beta 乘 Z-loss">
+                    <mrow>
+                        <mi>L</mi><mo>=</mo><msub><mi>L</mi><mrow><mi>lm</mi></mrow></msub><mo>+</mo>
+                        <mi>α</mi><msub><mi>L</mi><mrow><mi>aux</mi></mrow></msub><mo>+</mo>
+                        <mi>β</mi><msub><mi>L</mi><mi>z</mi></msub>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>其中 <math class="math-inline" aria-label="alpha"><mi>α</mi></math> 控制负载均衡强度（常用 0.01 量级），
+            <math class="math-inline" aria-label="beta"><mi>β</mi></math> 是 Z-loss 系数（常用 0.001 量级），用于抑制路由 logits 无节制增长。</p>
+
         <p>MoE训练调参和传统Dense模型有显著差异。下面这张表格总结了我在实践中总结的关键参数差异：</p>
 
         <table>
@@ -258,6 +331,34 @@ class MegablocksMoE(nn.Module):
             <strong>⚠️ 经典踩坑：</strong> 我曾遇到过一个非常隐蔽的问题：训练了10万步后，模型在验证集上的表现停滞不前。检查了所有常规指标——loss、准确率、路由均衡度——全部正常。最后发现，原来是某个专家的参数由于数值精度问题，在训练过程中逐渐退化成了"近似零输出"的状态。这个专家的FFN中间层权重在更新过程中，部分值落入了FP16的表示范围之外（overflow），导致这些权重被"冻结"为inf或NaN。解决方案是将该专家相关的操作切回FP32计算（mixed-precision中的keep in fp32），或者使用bf16替代fp16。
         </div>
 
+        <div class="moe-widget" id="aux-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 8 专家、Top-2，切换是否使用辅助损失，看专家负载的变异系数（CV）与训练稳定性。</p>
+            <div class="controls" role="group" aria-label="选择是否使用辅助损失">
+                <button type="button" data-m="none" aria-pressed="false">不加辅助损失</button>
+                <button type="button" data-m="aux" aria-pressed="true">α = 0.01 辅助损失</button>
+            </div>
+            <p class="widget-output" aria-live="polite">α=0.01：专家负载 CV ≈ 0.2（健康区间 0.1–0.3），坍缩风险低。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('aux-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                none: '不加辅助损失：专家负载 CV 可能 > 1.0，部分专家逐渐饿死，坍缩风险高、训练不稳定。',
+                aux: 'α=0.01：专家负载 CV ≈ 0.2（健康区间 0.1–0.3），坍缩风险低。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-m')];
+                });
+            }
+        })();
+        </script>
+
         <h2>收敛性监控与调试技巧</h2>
 
         <p>MoE训练的监控比Dense模型复杂得多。除了常规的loss和accuracy，你还需要额外关注一组"MoE特有指标"：</p>
@@ -313,7 +414,18 @@ class MegablocksMoE(nn.Module):
             <a href="index.html">📖 返回目录</a>
             <a href="27.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（辅助损失与 MoE 层）</li>
+                <li>Gale 等，<em>MegaBlocks: Efficient Sparse Training with Mixture-of-Experts</em>，2022（dropless 稀疏计算）</li>
+                <li>Microsoft，<em>Tutel: Adaptive Mixture-of-Experts at Scale</em>（专家并行与动态路由，见仓内文献索引）</li>
+            </ol>
+            <p>总损失三项、调参对照与监控指标（CV 0.1–0.3 等）为<strong>实践总结/教学示意</strong>；代码为最小教学实现，非完整模型。具体 API 与默认超参以各框架文档为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

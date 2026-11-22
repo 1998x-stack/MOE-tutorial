@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第28章 综合项目：构建领域MoE专家系统</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html" class="active">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第28章 综合项目：构建领域 MoE 专家系统</h1>
+            <p class="dek">把全书知识拼成一个端到端项目：为一个代码 MoE 助手准备数据、渐进式 MoE 化、评估与部署。</p>
+        </header>
 
         <h2>最后一章：把知识变成项目</h2>
 
@@ -51,6 +63,46 @@
         <p>这一章，我们将完成一个端到端的综合项目——<strong>构建一个代码MoE助手</strong>。这个项目的核心思路是：利用MoE的稀疏激活特性，训练一个专门面向编程领域的代码生成与理解模型，让不同的专家自动"学会"处理不同类型的编程任务（如Python数据分析、C++系统编程、前端HTML/CSS、算法竞赛等）。通过这个项目，你将亲手走一遍MoE从数据准备到部署上线的全流程。</p>
 
         <h2>项目概述：构建一个代码MoE助手</h2>
+
+        <p>参数账本要先算清：把每层 FFN 换成 MoE 后，总参数由注意力与全部专家组成，而每 token 只激活其中 k 个专家：</p>
+
+        <div class="math-equation" role="group" aria-label="总参数与活跃参数">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="参数量公式，可横向滚动">
+                <math display="block" aria-label="总参数等于注意力参数加 E 乘单专家参数；活跃参数等于注意力参数加 k 乘单专家参数">
+                    <mtable>
+                        <mtr><mtd><msub><mi>P</mi><mrow><mi>total</mi></mrow></msub><mo>=</mo><msub><mi>P</mi><mrow><mi>attn</mi></mrow></msub><mo>+</mo><mi>E</mi><mo>·</mo><msub><mi>P</mi><mrow><mi>exp</mi></mrow></msub></mtd></mtr>
+                        <mtr><mtd><msub><mi>P</mi><mrow><mi>active</mi></mrow></msub><mo>=</mo><msub><mi>P</mi><mrow><mi>attn</mi></mrow></msub><mo>+</mo><mi>k</mi><mo>·</mo><msub><mi>P</mi><mrow><mi>exp</mi></mrow></msub></mtd></mtr>
+                    </mtable>
+                </math>
+            </div>
+        </div>
+
+        <p>本例为 8 专家、Top-2：总参 4.2B、活跃 1.6B，属于典型的“参数多、计算少”。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 260" role="img" aria-labelledby="fig-proj-title fig-proj-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-proj-title">代码 MoE 助手的三阶段流程</title>
+                <desc id="fig-proj-desc">三个阶段：数据准备与预处理（四个编程子领域）→ 模型架构设计与训练（渐进式 MoE 化，ZeRO-2 + 专家并行）→ 评估与部署（四维度评估、ONNX 部署与专家缓存）。</desc>
+                <rect x="20" y="70" width="240" height="120" rx="14" fill="#ecfeff" stroke="#147f80" stroke-width="2"/>
+                <text x="140" y="100" font-size="14" text-anchor="middle" fill="#0f4c4a" font-weight="700">Phase 1 数据</text>
+                <text x="140" y="126" font-size="12" text-anchor="middle" fill="#0f4c4a">四个编程子领域</text>
+                <text x="140" y="146" font-size="12" text-anchor="middle" fill="#0f4c4a">清洗、去重、按域配比</text>
+                <rect x="300" y="70" width="240" height="120" rx="14" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="420" y="100" font-size="14" text-anchor="middle" fill="#4c1d95" font-weight="700">Phase 2 模型/训练</text>
+                <text x="420" y="126" font-size="12" text-anchor="middle" fill="#6d28d9">渐进式 MoE 化</text>
+                <text x="420" y="146" font-size="12" text-anchor="middle" fill="#6d28d9">ZeRO-2 + 专家并行</text>
+                <rect x="580" y="70" width="240" height="120" rx="14" fill="#f0fdf4" stroke="#2b7a4b" stroke-width="2"/>
+                <text x="700" y="100" font-size="14" text-anchor="middle" fill="#14532d" font-weight="700">Phase 3 评估/部署</text>
+                <text x="700" y="126" font-size="12" text-anchor="middle" fill="#166534">四维度评估</text>
+                <text x="700" y="146" font-size="12" text-anchor="middle" fill="#166534">ONNX + 专家缓存</text>
+                <path d="M262 130 h34" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M300 124 l10 6 -10 6 z" fill="#94a3b8"/>
+                <path d="M542 130 h34" stroke="#94a3b8" stroke-width="2"/>
+                <path d="M580 124 l10 6 -10 6 z" fill="#94a3b8"/>
+                <text x="420" y="230" font-size="12" text-anchor="middle" fill="#475569">端到端项目：数据→架构→评估，每一步都以路由与专家日志为反馈回路（教学示意）</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 综合项目的三阶段：数据准备、渐进式 MoE 化训练、评估与部署。前一章的监控指标（CV、有效专家数）在这里成为调参的反馈信号。</figcaption>
+        </figure>
 
         <p>我们这个项目的目标很明确：基于一个中等规模的MoE架构（8专家、top-2路由），构建一个专门服务于编程场景的语言模型。具体来说，它应该能够在以下四种编程子领域中都表现出色：</p>
 
@@ -272,6 +324,34 @@ balanced = DatasetDict({
             <strong>⚠️ 训练踩坑实录：</strong> 在Stage 2切换到18层MoE时，我们遇到了一个"梯度爆炸"问题——loss直接从3.2飙升到47.8，整个训练几乎崩溃。排查了两天，最终发现根因是：新替换的12层MoE的路由网络初始权重过大导致logits巨大（最大值>50），softmax完全饱和。解决方案是在路由网络的初始化中加入一个小的缩放因子：<code>nn.init.normal_(router.weight, mean=0.0, std=0.02)</code>，而不是默认的 <code>kaiming_uniform</code>。这个问题只在"渐进式MoE化"中遇到（因为新路由的输入来自已经训练好的Dense层的输出，激活值范围与随机初始化时不同），如果是从头训练MoE反倒不会出现。这个坑花了我整整三天才爬出来，写在这里希望大家引以为戒。
         </div>
 
+        <div class="moe-widget" id="proj-demo">
+            <p class="widget-q"><strong>交互：</strong>对比原 Dense 模型与 MoE 化后的代码助手，看参数与推理延迟的取舍。</p>
+            <div class="controls" role="group" aria-label="选择模型">
+                <button type="button" data-m="dense" aria-pressed="false">原 Dense（1.3B）</button>
+                <button type="button" data-m="moe" aria-pressed="true">代码 MoE 助手</button>
+            </div>
+            <p class="widget-output" aria-live="polite">代码 MoE 助手：总参 4.2B，活跃 1.6B（8 专家 Top-2），推理延迟约 +33%。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('proj-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                dense: '原 Dense（1.3B）：总参 = 活跃参 = 1.3B，延迟基准 1.00×。',
+                moe: '代码 MoE 助手：总参 4.2B，活跃 1.6B（8 专家 Top-2），推理延迟约 +33%。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-m')];
+                });
+            }
+        })();
+        </script>
+
         <h2>Phase 3: 评估与部署</h2>
 
         <p>训练完成后，我们进入了最激动人心的阶段——看看我们的代码MoE助手到底表现如何。</p>
@@ -409,9 +489,21 @@ def deploy_inference(model_path, tokenizer, max_seq_len=2048):
         <div class="footer-nav">
             <a href="27.html">← 上一章</a>
             <a href="index.html">📖 返回目录</a>
+            <a href="index.html">📖 返回目录</a>
             <a href="javascript:void(0)">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Guo 等，<em>DeepSeek-Coder: When the Large Language Model Meets Programming</em>，2024。<a href="https://arxiv.org/abs/2401.14196">arXiv:2401.14196</a>（代码模型基座）</li>
+                <li>Gale 等，<em>MegaBlocks: Efficient Sparse Training with Mixture-of-Experts</em>，2022（dropless 稀疏计算）</li>
+                <li>Rajbhandari 等，<em>DeepSpeed-MoE</em>，2022（ZeRO + 专家并行）</li>
+            </ol>
+            <p>项目配置、总/活跃参数与评估维度为<strong>教学设计示例（已作简化）</strong>；具体指标与实现细节为示意，非实测报告。数据集与框架 API 以各官方文档为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

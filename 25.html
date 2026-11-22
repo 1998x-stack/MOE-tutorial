@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第25章 自适应路由与动态推理</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第25章 自适应路由与动态推理</h1>
+            <p class="dek">固定 Top-K 相当于“给所有顾客上同分量的菜”。用路由熵判断 token 复杂度，在推理时动态决定激活几个专家。</p>
+        </header>
 
         <h2>固定Top-K的局限</h2>
 
@@ -57,6 +69,42 @@
         </div>
 
         <h2>熵引导的自适应路由</h2>
+
+        <p>把路由 softmax 后的分布记为 <math class="math-inline" aria-label="p"><mi>p</mi></math>，它的信息熵就是“不确定性”的度量：</p>
+
+        <div class="math-equation" role="group" aria-label="路由熵公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="路由熵公式，可横向滚动">
+                <math display="block" aria-label="路由熵 H(p) 等于 负的 i 从 1 到 E 的 p_i 乘 log p_i 之和">
+                    <mrow>
+                        <mi>H</mi><mo stretchy="false">(</mo><mi>p</mi><mo stretchy="false">)</mo><mo>=</mo><mo>−</mo>
+                        <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>E</mi></munderover>
+                        <msub><mi>p</mi><mi>i</mi></msub><mi>log</mi><msub><mi>p</mi><mi>i</mi></msub>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>熵越低说明路由“干脆”（一个专家就够），熵越高说明它“犹豫”（需要多个专家）。因此可以用阈值把熵映射成激活个数 <math class="math-inline" aria-label="k"><mi>k</mi></math>：熵低则 <math class="math-inline" aria-label="k=1"><mi>k</mi><mo>=</mo><mn>1</mn></math>，熵高则增加。</p>
+
+        <figure>
+            <svg viewBox="0 0 820 300" role="img" aria-labelledby="fig-ent-title fig-ent-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-ent-title">路由熵到激活专家数的阶梯映射</title>
+                <desc id="fig-ent-desc">横轴为路由分布的信息熵，纵轴为激活专家数 k。低熵区域 k=1，中等熵 k=2，高熵 k=3 或更多。简单 token（如虚词）落在低熵区，复杂 token（如专业术语）落在高熵区。</desc>
+                <line x1="90" y1="250" x2="780" y2="250" stroke="#94a3b8" stroke-width="2"/>
+                <line x1="90" y1="90" x2="90" y2="250" stroke="#94a3b8" stroke-width="2"/>
+                <text x="430" y="282" font-size="13" fill="#475569" text-anchor="middle">路由熵 H(p) 低 → 高</text>
+                <text x="76" y="110" font-size="13" fill="#475569" text-anchor="end">k</text>
+                <polyline points="90,230 350,230 350,170 560,170 560,110 780,110" fill="none" stroke="#147f80" stroke-width="3"/>
+                <line x1="350" y1="110" x2="350" y2="250" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4"/>
+                <line x1="560" y1="110" x2="560" y2="250" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4"/>
+                <text x="150" y="216" font-size="13" fill="#0f4c4a">k = 1</text>
+                <text x="420" y="156" font-size="13" fill="#0f4c4a">k = 2</text>
+                <text x="630" y="96" font-size="13" fill="#0f4c4a">k ≥ 3</text>
+                <text x="100" y="70" font-size="12" fill="#7c2d12">例：的 / is / the（低熵）</text>
+                <text x="600" y="140" font-size="12" fill="#7c2d12">例：量子推导术语（高熵）</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 熵引导的自适应路由（示意）：用一个无需训练的复杂度信号（路由熵）把 token 映射到不同的 k。简单 token 少算、复杂 token 多算。</figcaption>
+        </figure>
 
         <p>自适应路由的核心挑战是：<strong>如何在推理时判断一个token的"复杂度"</strong>？一种自然而优雅的思路是：<strong>利用路由分数的熵（Entropy）</strong>。</p>
 
@@ -108,6 +156,37 @@ def entropy_guided_routing(scores, base_k=2, min_k=1, max_k=4):
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> 熵引导的自适应路由的优雅之处在于——它<strong>不需要任何额外的训练</strong>。你拿着一个已经训练好的固定 Top-K 的 MoE 模型（比如 Mixtral 8×7B），推理时只需要在路由后加一行计算熵的代码，就能获得自适应路由的能力。这意味着你可以<strong>零成本</strong>地在已部署的模型上开启动态推理优化。这也是它比那些需要重新训练的自适应方法（如《From Sparse to Soft Mixtures》中的方法）更受工业界欢迎的原因。
         </div>
+
+        <div class="moe-widget" id="entk-demo">
+            <p class="widget-q"><strong>交互：</strong>按 token 复杂度选择不同的路由熵，看系统决定激活多少个专家。</p>
+            <div class="controls" role="group" aria-label="选择 token 复杂度">
+                <button type="button" data-h="0.4" aria-pressed="true">简单（的 / is）</button>
+                <button type="button" data-h="1.4" aria-pressed="false">中等</button>
+                <button type="button" data-h="2.4" aria-pressed="false">复杂（专业术语）</button>
+            </div>
+            <p class="widget-output" aria-live="polite">简单 token：路由熵 H≈0.4（阈值 < 1.0）→ 激活 k=1。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('entk-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            function render(h) {
+                var k = h < 1.0 ? 1 : (h < 2.0 ? 2 : 3);
+                var name = h < 1.0 ? '简单 token' : (h < 2.0 ? '中等 token' : '复杂 token');
+                out.textContent = name + '：路由熵 H≈' + h + '（阈值区间决定 k）→ 激活 k=' + k + '。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(parseFloat(this.getAttribute('data-h')));
+                });
+            }
+            render(0.4);
+        })();
+        </script>
 
         <h2>Adaptive-K实战：24-33%算力削减</h2>
 
@@ -300,7 +379,18 @@ def adaptive_speculative_decode(draft_model, target_moe, prompt, gamma=4):
             <a href="index.html">📖 返回目录</a>
             <a href="26.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a>（固定 Top-2 基线）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（固定 Top-K 与无辅助损失均衡）</li>
+                <li>Adaptive-K（2025，MIT/CMU 与 DeepSeek 研究者合作）—— 推理时阈值化自适应 Top-K（见仓内文献索引）</li>
+            </ol>
+            <p>路由熵定义与阶梯映射为<strong>教学说明</strong>；熵数值、阈值区间、「算力削减 24–33%」「延迟降至 38%」等引自相关工作的<strong>教学引用/示意</strong>，具体数值以原始文献为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第27章 2025-2026前沿与未来方向</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html" class="active">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第27章 2025-2026 前沿与未来方向</h1>
+            <p class="dek">从“有效专家数”看专家浓度，再看后 MoE 的流形约束（mHC）、可解释性与移动端标准化的可能走向。</p>
+        </header>
 
         <h2>站在2026看MoE的未来</h2>
 
@@ -129,6 +141,52 @@
 
         <h2>MoE Lens与专家浓度发现</h2>
 
+        <p>“专家浓度”背后的一个自然量度是<strong>有效专家数</strong>——把路由分布 <math class="math-inline" aria-label="p"><mi>p</mi></math> 的困惑度当作实际参与表达的专家个数：</p>
+
+        <div class="math-equation" role="group" aria-label="有效专家数公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="有效专家数公式，可横向滚动">
+                <math display="block" aria-label="有效专家数 N_eff 等于 exp 的 负 i 从 1 到 E 的 p_i ln p_i 之和">
+                    <mrow>
+                        <msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub><mo>=</mo>
+                        <mi>exp</mi><mrow><mo>(</mo><mo>−</mo>
+                            <munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>E</mi></munderover>
+                            <msub><mi>p</mi><mi>i</mi></msub><mi>ln</mi><msub><mi>p</mi><mi>i</mi></msub>
+                        <mo>)</mo></mrow>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>当路由均匀分布时 <math class="math-inline" aria-label="N_eff 等于配置的专家数 E"><msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub><mo>=</mo><mi>E</mi></math>；路由越集中，<math class="math-inline" aria-label="N_eff"><msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub></math> 越小——说明“配置了很多专家，实际有效的没几个”。</p>
+
+        <figure>
+            <svg viewBox="0 0 840 300" role="img" aria-labelledby="fig-conc-title fig-conc-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-conc-title">配置专家数与有效专家数的差异</title>
+                <desc id="fig-conc-desc">左图：8 个专家被均匀使用，有效专家数等于 8。右图：路由严重倾斜到少数专家，有效专家数远小于配置的 8，说明实际多样性降低。</desc>
+                <rect x="20" y="50" width="390" height="200" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <rect x="430" y="50" width="390" height="200" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <text x="215" y="34" font-size="14" font-weight="700" fill="#147f80" text-anchor="middle">均匀使用：N_eff = E = 8</text>
+                <text x="625" y="34" font-size="14" font-weight="700" fill="#b91c1c" text-anchor="middle">路由倾斜：N_eff ≈ 4.5</text>
+                <g fill="#147f80">
+                    <rect x="50" y="110" width="30" height="110"/><rect x="92" y="110" width="30" height="110"/>
+                    <rect x="134" y="110" width="30" height="110"/><rect x="176" y="110" width="30" height="110"/>
+                    <rect x="218" y="110" width="30" height="110"/><rect x="260" y="110" width="30" height="110"/>
+                    <rect x="302" y="110" width="30" height="110"/><rect x="344" y="110" width="30" height="110"/>
+                </g>
+                <g fill="#dc2626">
+                    <rect x="460" y="70" width="30" height="150"/><rect x="502" y="95" width="30" height="125"/>
+                    <rect x="544" y="135" width="30" height="85"/>
+                </g>
+                <g fill="#cbd5e1">
+                    <rect x="586" y="185" width="30" height="35"/><rect x="628" y="196" width="30" height="24"/>
+                    <rect x="670" y="205" width="30" height="15"/><rect x="712" y="210" width="30" height="10"/>
+                    <rect x="754" y="214" width="30" height="6"/>
+                </g>
+                <text x="20" y="286" font-size="12" fill="#475569">柱高 = 各专家被路由的 token 占比（教学示意）</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 配置了 E 个专家不等于用到 E 个专家（示意）：路由越倾斜，有效专家数 <math class="math-inline" aria-label="N_eff"><msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub></math> 越低。监控该指标可判断“专家冗余”是否过量。</figcaption>
+        </figure>
+
         <p>另一个2025-2026年非常火热的方向是<strong>MoE可解释性</strong>。虽然我们在第22章已经讨论过专家语义发现的基础工作，但2025年出现的<strong>MoE Lens</strong>框架将这个领域向前推进了一大步。</p>
 
         <p>MoE Lens由Anthropic的interpretability团队提出（是的，就是那个做Claude可解释性研究的团队），它借用了一部分"机械可解释性"（Mechanistic Interpretability）的工具箱，专门用于分析MoE模型中的专家行为。它的核心发现是：<strong>专家的专业化程度远比我们想象的更加细粒度</strong>。</p>
@@ -174,6 +232,43 @@ def compute_expert_concentration(model, tokens, top_k=2):
         <div class="warning">
             <strong>⚠️ 实践提醒：</strong> MoE Lens 的另一个重要警示是：不要只看路由分配比例来判断专家是否"健康"。一个专家可能虽然被路由频繁选中（负载高），但其输出权重在 top-k 聚合中被其他专家覆盖了——即"看似忙碌，实则冗余"。最健康的专家状态是：负载适中 + 方向正交（与其他专家输出方向差异大）。在做专家剪枝或容量规划时，请务必参考这个二维指标，而非只看单维的激活计数。
         </div>
+
+        <div class="moe-widget" id="neff-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 8 个专家，切换路由分布的“锋利程度”，看有效专家数 <math class="math-inline" aria-label="N_eff"><msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub></math> 如何变化。</p>
+            <div class="controls" role="group" aria-label="选择路由分布">
+                <button type="button" data-d="even" aria-pressed="true">均匀分布</button>
+                <button type="button" data-d="mid" aria-pressed="false">中等集中</button>
+                <button type="button" data-d="sharp" aria-pressed="false">极度倾斜</button>
+            </div>
+            <p class="widget-output" aria-live="polite">均匀分布：N_eff = 8.0（等于配置的专家数）。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('neff-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var sets = {
+                even: [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],
+                mid: [0.30, 0.20, 0.15, 0.10, 0.10, 0.05, 0.05, 0.05],
+                sharp: [0.70, 0.15, 0.05, 0.03, 0.03, 0.02, 0.01, 0.01]
+            };
+            var names = { even: '均匀分布', mid: '中等集中', sharp: '极度倾斜' };
+            function render(d) {
+                var p = sets[d], H = 0;
+                for (var i = 0; i < p.length; i++) if (p[i] > 0) H -= p[i] * Math.log(p[i]);
+                out.textContent = names[d] + '：N_eff = exp(' + H.toFixed(2) + ') ≈ ' + Math.exp(H).toFixed(1) + '（配置 8 个专家）。';
+            }
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    render(this.getAttribute('data-d'));
+                });
+            }
+            render('even');
+        })();
+        </script>
 
         <h2>移动端MoE与MLPerf标准化</h2>
 
@@ -253,7 +348,18 @@ def compute_expert_concentration(model, tokens, top_k=2):
             <a href="index.html">📖 返回目录</a>
             <a href="28.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Jiang 等，<em>Mixtral of Experts</em>，2024。<a href="https://arxiv.org/abs/2401.04088">arXiv:2401.04088</a></li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a></li>
+                <li>“Disentangling Mixture of Experts with Semantic Activation Patterns”（2025）—— 专家语义与浓度分析（见仓内文献索引）</li>
+            </ol>
+            <p><strong>前瞻性说明：</strong>本章关于 2025–2026 之后的部分内容（如超大规模模型、DeepSeek-V4、mHC、MLPerf Mobile MoE 等）属于<strong>前瞻性设想/教学推演</strong>，未经独立验证；有效专家数 <math class="math-inline" aria-label="N_eff"><msub><mi>N</mi><mrow><mi>eff</mi></mrow></msub></math> 的定义与计算是可验证的，其余具体数字与事件请以公开原始资料为准。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
