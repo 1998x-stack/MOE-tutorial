@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第13章 DeepSeekMoE：专家专业化创新 (下)</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第13章 DeepSeekMoE：专家专业化创新（下）</h1>
+            <p class="dek">从路由评分到激活个数：细粒度路由的数学、最优 Top-m 的取舍，以及专家可视化里看到的专业化分簇。</p>
+        </header>
 
         <h2>细粒度路由的数学原理</h2>
 
@@ -93,6 +105,20 @@ class FineGrainedRouter(torch.nn.Module):
         <div class="highlight">
             <strong>🔑 数学洞察：</strong> 细粒度路由的本质是一种"聚类+匹配"的过程。每个专家的嵌入 <code>e_i</code> 可以看作是一个聚类的质心（centroid），而路由过程等价于将 token 分配到最近的质心。传统 MoE 的 router 只是做一个线性分类，没有这种"显式聚类"的约束——这就是为什么 DeepSeekMoE 的专家专业化程度显著更高。
         </div>
+
+        <div class="math-equation" role="group" aria-label="DeepSeekMoE 路由亲和度公式">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="路由亲和度公式，可横向滚动">
+                <math display="block" aria-label="第 t 个 token 对第 i 个专家的亲和度 s 下标 i,t 等于 token 表示 u_t 转置 乘以 专家质心 e_i">
+                    <mrow>
+                        <msub><mi>s</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo>
+                        <msubsup><mi>u</mi><mi>t</mi><mo>⊤</mo></msubsup>
+                        <msub><mi>e</mi><mi>i</mi></msub>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>论文中的路由得分是 token 表示 <math class="math-inline" aria-label="u_t"><msub><mi>u</mi><mi>t</mi></msub></math> 与专家质心 <math class="math-inline" aria-label="e_i"><msub><mi>e</mi><mi>i</mi></msub></math> 的亲和度，再做 softmax、取 Top-K。<strong>需要说明：</strong>上文出现的 <math class="math-inline" aria-label="s_i 等于 W_i x 加 lambda 乘 sim(e_i, g(x))"><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>W</mi><mi>i</mi></msub><mi>x</mi><mo>+</mo><mi>λ</mi><mo>·</mo><mi>sim</mi><mo stretchy="false">(</mo><msub><mi>e</mi><mi>i</mi></msub><mo>,</mo><mi>g</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></math> 是为了直观说明「专家签名」而写的<strong>教学解释式</strong>，并非论文的原始公式。</p>
 
         <h2>激活策略：几个专家最合适？</h2>
 
@@ -169,6 +195,36 @@ class FineGrainedRouter(torch.nn.Module):
             <strong>💡 实用建议：</strong> 在设计你自己的 MoE 模型时，可以用以下公式估算最优的激活专家数 K：K ≈ 0.1 × N_routed + 2，其中 N_routed 是路由专家总数。这个经验公式来自 DeepSeekMoE 的实验结果，在 16-128 个专家的范围内适用性较好。当然，最佳实践还是多做几组消融实验来确定。
         </div>
 
+        <div class="moe-widget" id="k-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 64 个路由专家，切换每个 token 激活的专家数 K，观察「知识覆盖」与「路由区分度」之间的取舍。</p>
+            <div class="controls" role="group" aria-label="选择激活专家数 K">
+                <button type="button" data-k="2" aria-pressed="false">K = 2</button>
+                <button type="button" data-k="6" aria-pressed="true">K = 6</button>
+                <button type="button" data-k="20" aria-pressed="false">K = 20</button>
+            </div>
+            <p class="widget-output" aria-live="polite">K=6：约 9.4% 的专家被激活，知识覆盖与区分度较均衡（论文建议区间附近）。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('k-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var text = {
+                '2': 'K=2：约 3.1% 的专家被激活，知识覆盖面偏窄，单 token 接触的专家太少。',
+                '6': 'K=6：约 9.4% 的专家被激活，知识覆盖与区分度较均衡（论文建议区间附近）。',
+                '20': 'K=20：约 31.3% 的专家被激活，区分度明显下降，接近稠密计算。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = text[this.getAttribute('data-k')];
+                });
+            }
+        })();
+        </script>
+
         <h2>性能对比：碾压GShard和Switch</h2>
 
         <p>DeepSeekMoE论文的标题中写着"Towards Ultimate Expert Specialization"——它确实用大量的实验证明了自己在专家专业化方面的优势。让我们看看关键的对比数据：</p>
@@ -240,6 +296,33 @@ class FineGrainedRouter(torch.nn.Module):
 
         <h2>专家可视化：看到了什么？</h2>
 
+        <figure>
+            <svg viewBox="0 0 840 330" role="img" aria-labelledby="fig-tsne-title fig-tsne-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-tsne-title">传统 MoE 与 DeepSeekMoE 的专家嵌入分布对比</title>
+                <desc id="fig-tsne-desc">左侧传统 MoE 的专家嵌入在 2D 空间均匀散布，没有明显分簇；右侧 DeepSeekMoE 的专家嵌入形成数个清晰的颜色分簇，每簇对应一类知识领域。</desc>
+                <rect x="20" y="44" width="380" height="250" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <rect x="440" y="44" width="380" height="250" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
+                <text x="210" y="32" font-size="14" font-weight="700" fill="#475569" text-anchor="middle">传统 MoE：均匀分布，无分簇</text>
+                <text x="630" y="32" font-size="14" font-weight="700" fill="#4c1d95" text-anchor="middle">DeepSeekMoE：清晰分簇</text>
+                <g fill="#94a3b8">
+                    <circle cx="80" cy="110" r="7"/><circle cx="150" cy="150" r="7"/><circle cx="220" cy="100" r="7"/>
+                    <circle cx="300" cy="140" r="7"/><circle cx="350" cy="220" r="7"/><circle cx="120" cy="230" r="7"/>
+                    <circle cx="250" cy="250" r="7"/><circle cx="180" cy="90" r="7"/><circle cx="90" cy="190" r="7"/>
+                    <circle cx="330" cy="90" r="7"/><circle cx="210" cy="200" r="7"/><circle cx="280" cy="190" r="7"/>
+                </g>
+                <g fill="#147f80"><circle cx="520" cy="110" r="7"/><circle cx="545" cy="120" r="7"/><circle cx="515" cy="135" r="7"/><circle cx="555" cy="95" r="7"/></g>
+                <g fill="#d06d4d"><circle cx="700" cy="110" r="7"/><circle cx="730" cy="125" r="7"/><circle cx="690" cy="135" r="7"/><circle cx="745" cy="100" r="7"/></g>
+                <g fill="#7c3aed"><circle cx="560" cy="240" r="7"/><circle cx="590" cy="255" r="7"/><circle cx="545" cy="260" r="7"/><circle cx="610" cy="235" r="7"/></g>
+                <g fill="#b45309"><circle cx="730" cy="240" r="7"/><circle cx="760" cy="255" r="7"/><circle cx="710" cy="260" r="7"/></g>
+                <text x="520" y="170" font-size="12" fill="#0f4c4a">数学/逻辑</text>
+                <text x="690" y="170" font-size="12" fill="#9a3412">语法/结构</text>
+                <text x="530" y="290" font-size="12" fill="#4c1d95">实体识别</text>
+                <text x="700" y="290" font-size="12" fill="#92400e">其他领域</text>
+                <text x="20" y="316" font-size="12" fill="#475569">点 = 专家嵌入向量的 2D 投影（t-SNE）；颜色为教学示意标注</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 专家嵌入的 t-SNE 投影：传统 MoE 的专家嵌入均匀散开（专业化弱），DeepSeekMoE 形成若干按知识领域分簇的结构（专业化强）。分簇标签为教学示意。</figcaption>
+        </figure>
+
         <p>论文中最令人兴奋的部分之一是<strong>专家可视化分析</strong>。作者使用t-SNE将DeepSeekMoE 16B模型的64个路由专家的嵌入向量投影到2D空间，并使用不同颜色标记不同类型的数据。</p>
 
         <p>结果令人惊叹：在DeepSeekMoE中，专家嵌入在空间中形成了清晰的分簇结构，每个簇对应一类特定的知识领域——比如"数学运算类"专家、"语法结构类"专家、"实体识别类"专家……相比之下，传统GShard的专家嵌入分布更加均匀，没有形成明显的分簇——说明专家专业化程度较低。</p>
@@ -291,7 +374,17 @@ def analyze_expert_specialization(model, tokenized_corpus):
             <a href="index.html">📖 返回目录</a>
             <a href="14.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>Dai 等，<em>DeepSeekMoE: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a></li>
+                <li>Lepikhin 等，<em>GShard</em>，2021。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a>（对比基线）</li>
+            </ol>
+            <p>路由亲和度、激活专家数实验与专家可视化分析引自 DeepSeekMoE 论文及仓内 <code>pdfs/06_DeepSeekMoE_2024_Dai.pdf</code>。上文的 <math class="math-inline" aria-label="s 等于 W x 加 lambda sim"><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>W</mi><mi>i</mi></msub><mi>x</mi><mo>+</mo><mi>λ</mi><mo>·</mo><mi>sim</mi></math> 为<strong>教学解释式（非论文原式）</strong>；K 百分比与分簇标签为教学示意。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

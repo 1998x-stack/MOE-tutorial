@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第16章 辅助损失-free负载均衡深度剖析</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,10 +49,37 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第16章 辅助损失-free 负载均衡深度剖析</h1>
+            <p class="dek">辅助损失为何会“拉偏”门控？ALF-LB 如何用动态 bias 把负载均衡从梯度层移到决策层，并从原对偶视角理解它的收敛性。</p>
+        </header>
 
         <h2>辅助损失的代价：梯度冲突</h2>
+
+        <figure>
+            <svg viewBox="0 0 820 300" role="img" aria-labelledby="fig-conflict-title fig-conflict-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-conflict-title">门控网络收到的两个相互拉扯的梯度</title>
+                <desc id="fig-conflict-desc">门控网络同时收到来自主任务损失的梯度（把 token 送到最合适的专家）和来自辅助损失的梯度（把 token 平均分给各专家），两者方向经常相反，造成梯度冲突。</desc>
+                <rect x="300" y="40" width="220" height="70" rx="14" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+                <text x="410" y="70" font-size="15" text-anchor="middle" fill="#4c1d95" font-weight="700">门控网络 Gate</text>
+                <text x="410" y="92" font-size="12" text-anchor="middle" fill="#6d28d9">同一组参数</text>
+                <rect x="40" y="170" width="250" height="70" rx="14" fill="#eef2ff" stroke="#7461ba" stroke-width="2"/>
+                <text x="165" y="198" font-size="14" text-anchor="middle" fill="#3730a3">主任务损失梯度</text>
+                <text x="165" y="220" font-size="12" text-anchor="middle" fill="#475569">“送到最有用的专家”</text>
+                <rect x="530" y="170" width="250" height="70" rx="14" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
+                <text x="655" y="198" font-size="14" text-anchor="middle" fill="#991b1b">辅助损失梯度</text>
+                <text x="655" y="220" font-size="12" text-anchor="middle" fill="#7f1d1d">“平均分给各专家”</text>
+                <path d="M200 168 C260 130 300 108 336 100" stroke="#7461ba" stroke-width="2.4" fill="none"/>
+                <path d="M340 94 l14 4 -8 12 z" fill="#7461ba"/>
+                <path d="M620 168 C560 130 520 108 484 100" stroke="#ef4444" stroke-width="2.4" fill="none"/>
+                <path d="M480 94 l-14 4 8 12 z" fill="#ef4444"/>
+                <text x="410" y="150" font-size="13" text-anchor="middle" fill="#b91c1c">两个指令经常相反 → 梯度冲突</text>
+                <text x="40" y="282" font-size="12" fill="#475569">辅助损失 α 越大，红色拉力越强；过强则门控“躺平”、专家区分度下降</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> 辅助损失与主任务在门控参数上争夺梯度：主任务想把 token 集中送到“最懂”的专家，辅助损失想把 token 摊平。系数 α 需要在两者间艰难折中——这正是 ALF-LB 想绕开的矛盾。</figcaption>
+        </figure>
 
         <p>大家好，我是你们的讲师。上一章我们介绍了DeepSeek-V3的ALF-LB方案——用动态bias替代辅助损失来实现负载均衡。你可能会想："这个方案看起来很简洁，但传统的辅助损失到底有什么问题，值得这么大动干戈地替换它？" 这一章，我们就来一探究竟。</p>
 
@@ -128,6 +163,24 @@ class ALFLoadBalancer:
 
         <h2>原对偶理论：从数学角度理解收敛</h2>
 
+        <p>把每个专家的目标负载看作约束，负载均衡问题可以写成带约束的优化：</p>
+
+        <div class="math-equation" role="group" aria-label="带约束的负载均衡优化">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="约束优化公式，可横向滚动">
+                <math display="block" aria-label="最小化任务损失 L_task 关于 theta，受约束每个专家的负载 f_i 等于目标 tau">
+                    <mrow>
+                        <munder><mi>min</mi><mi>θ</mi></munder>
+                        <msub><mi>L</mi><mrow><mi>task</mi></mrow></msub><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo>
+                        <mspace width="1.2em"/>
+                        <mtext>s.t.</mtext><mspace width="0.6em"/>
+                        <msub><mi>f</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo><mo>=</mo><mi>τ</mi><mo>,</mo><mspace width="0.5em"/><mo>∀</mo><mi>i</mi>
+                    </mrow>
+                </math>
+            </div>
+        </div>
+
+        <p>把第 <math class="math-inline" aria-label="i"><mi>i</mi></math> 个约束对应的对偶变量记为 <math class="math-inline" aria-label="b_i"><msub><mi>b</mi><mi>i</mi></msub></math>，则 ALF-LB 中的 bias 正是这个对偶变量：对偶梯度上升沿约束违反方向更新 <math class="math-inline" aria-label="b_i"><msub><mi>b</mi><mi>i</mi></msub></math>，因此机制上朝着可行解移动，而不需要把约束写进主损失。</p>
+
         <p>ALF-LB看起来简单，但它为什么能保证收敛？这就涉及到一个更深刻的数学框架——<strong>原对偶优化（Primal-Dual Optimization）</strong>。</p>
 
         <p>让我们把负载均衡问题重新表述为：</p>
@@ -199,6 +252,36 @@ class ALFLoadBalancer:
         </div>
 
         <h2>实战：ALF-LB vs 传统辅助损失的对比</h2>
+
+        <div class="moe-widget" id="strategy-demo">
+            <p class="widget-q"><strong>交互：</strong>固定 8 专家、Top-2 路由、50B token 训练量，切换负载均衡策略，比较利用率标准差、验证集 Loss 与调参成本。</p>
+            <div class="controls" role="group" aria-label="选择负载均衡策略">
+                <button type="button" data-s="none" aria-pressed="false">无负载均衡</button>
+                <button type="button" data-s="aux" aria-pressed="false">辅助损失 α=0.01</button>
+                <button type="button" data-s="alf" aria-pressed="true">ALF-LB lr=0.01</button>
+            </div>
+            <p class="widget-output" aria-live="polite">ALF-LB：利用率标准差 3.1%，验证集 Loss 3.15，loss 方差 0.015，超参稳健、几乎无需调参。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('strategy-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                none: '无负载均衡：专家利用率标准差高，训练中期易出现负载倾斜甚至坍缩。',
+                aux: '辅助损失 α=0.01：利用率标准差 4.2%，验证集 Loss 3.19，loss 方差 0.028；确定 α 约需 3 天网格搜索。',
+                alf: 'ALF-LB：利用率标准差 3.1%，验证集 Loss 3.15，loss 方差 0.015，超参稳健、几乎无需调参。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-s')];
+                });
+            }
+        })();
+        </script>
 
         <p>理论讲得再好，不如实战数据来得有说服力。让我们来做一个系统的对比实验。假设我们在一个标准的MoE模型（8专家，top-2路由，d_model=1024）上做对比，使用相同的训练数据（C4数据集子集，50B token），唯一的变量是负载均衡策略。</p>
 
@@ -272,7 +355,18 @@ class ALFLoadBalancer:
             <a href="index.html">📖 返回目录</a>
             <a href="17.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（ALF-LB 与消融）</li>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（辅助损失起源）</li>
+                <li>Boyd, Vandenberghe，<em>Convex Optimization</em>，Cambridge University Press，2004（原对偶基础）</li>
+            </ol>
+            <p>ALF-LB 的 bias-作为-对偶变量、lr 鲁棒性区间（0.001–0.1）引自 DeepSeek-V3 报告及仓内 <code>pdfs/08_DeepSeek-V3_2024_Liu.pdf</code>。对比实验表（利用率标准差 3.1%/4.2%、Loss 3.15/3.19、调优 3 天）为<strong>教学示意</strong>，仅用于展示趋势，非论文实测。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>

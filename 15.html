@@ -5,11 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>第15章 DeepSeek-V3：无损负载均衡新范式</title>
     <link rel="stylesheet" href="theme.css">
+    <style>
+        pre { max-width: 100%; overflow-x: auto; }
+        code { overflow-wrap: anywhere; }
+        th, td { overflow-wrap: anywhere; }
+        figure svg { max-width: 100%; height: auto; }
+        img { max-width: 100%; }
+    </style>
 </head>
 <body>
+<a class="skip-link" href="#content">跳转至正文</a>
 <div class="double-border">
 <div class="container">
-    <div class="sidebar">
+    <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
             <li><a href="01.html">第1章 MoE概述与演进史</a></li>
@@ -41,8 +49,12 @@
             <li><a href="27.html">第27章 2025-2026前沿与未来方向</a></li>
             <li><a href="28.html">第28章 综合项目：构建领域MoE专家系统</a></li>
         </ul>
-    </div>
-    <div class="main-content">
+    </nav>
+    <main class="main-content" id="content"><article>
+        <header class="article-header">
+            <h1>第15章 DeepSeek-V3：无损负载均衡新范式</h1>
+            <p class="dek">671B 总参、37B 活跃、$5.576M 训练成本：三个创新（ALF-LB、MTP、FP8）如何从系统里精确地“抠”出每一分浪费。</p>
+        </header>
 
         <h2>DeepSeek-V3：重新定义MoE训练</h2>
 
@@ -105,6 +117,42 @@
 
         <h2>移除辅助损失：为什么这是革命性的？</h2>
 
+        <figure>
+            <svg viewBox="0 0 820 360" role="img" aria-labelledby="fig-alf-title fig-alf-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-alf-title">ALF-LB 的负载均衡反馈控制环</title>
+                <desc id="fig-alf-desc">四个阶段构成闭环：统计各专家实际负载 → 调整每个专家的 bias（过载就降低、欠载就提高）→ 路由评分加上 bias → 选出 Top-K 专家，从而反过来改变下一轮的负载。均衡来自反馈机制，而非额外损失项。</desc>
+                <g stroke-width="2">
+                    <rect x="320" y="18" width="180" height="52" rx="12" fill="#f5f3ff" stroke="#7c3aed"/>
+                    <rect x="600" y="152" width="200" height="52" rx="12" fill="#ecfeff" stroke="#147f80"/>
+                    <rect x="320" y="290" width="180" height="52" rx="12" fill="#f5f3ff" stroke="#7c3aed"/>
+                    <rect x="20" y="152" width="200" height="52" rx="12" fill="#ecfeff" stroke="#147f80"/>
+                </g>
+                <g font-size="14" text-anchor="middle">
+                    <text x="410" y="42" fill="#4c1d95">统计实际负载 load_i</text>
+                    <text x="410" y="60" fill="#6d28d9" font-size="11">（每个 batch 统计）</text>
+                    <text x="700" y="183" fill="#0f4c4a">调整 bias b_i</text>
+                    <text x="700" y="200" fill="#0f4c4a" font-size="11">过载↓，欠载↑</text>
+                    <text x="410" y="314" fill="#4c1d95">路由评分 s_i + b_i</text>
+                    <text x="410" y="332" fill="#6d28d9" font-size="11">（bias 只影响选择，不参与梯度）</text>
+                    <text x="120" y="183" fill="#0f4c4a">选出 Top-K 专家</text>
+                </g>
+                <g stroke="#94a3b8" stroke-width="2" fill="none">
+                    <path d="M502 52 C560 60 588 130 600 168"/>
+                    <path d="M700 206 C660 250 560 306 502 314"/>
+                    <path d="M318 314 C250 306 190 250 180 206"/>
+                    <path d="M180 150 C220 110 300 60 318 52"/>
+                </g>
+                <g fill="#64748b">
+                    <path d="M598 158 l10 14 -14 2 z"/>
+                    <path d="M500 306 l-2 16 -12 -8 z"/>
+                    <path d="M182 208 l-10 -2 4 -14 z"/>
+                    <path d="M320 56 l2 -16 12 8 z"/>
+                </g>
+                <text x="410" y="183" font-size="13" text-anchor="middle" fill="#475569">负载来自机制，而非额外损失</text>
+            </svg>
+            <figcaption><span class="fig-num">图 1</span> ALF-LB 把负载均衡从「梯度」移到「决策」：bias 根据负载统计不断被调整，直接改变路由选择，形成负反馈闭环。因为 bias 不参与梯度，它不会与主任务的梯度冲突。</figcaption>
+        </figure>
+
         <p>如果你读完了前面关于负载均衡的章节，你一定对<strong>辅助损失（Auxiliary Loss）</strong>不陌生。从Shazeer 2017年的Sparsely-Gated MoE开始，几乎所有MoE模型都依赖一个额外的损失项来鼓励路由均匀分配token到各个专家。这个损失通常与主任务的交叉熵损失相加，权重系数α需要精心调节——调大了影响主任务性能，调小了负载又不均衡。</p>
 
         <p>DeepSeek-V3提出了一个石破天惊的想法：<strong>为什么一定要用辅助损失？能不能从路由机制本身入手，让负载均衡自然发生？</strong></p>
@@ -143,6 +191,19 @@ def alf_load_balancing(scores, expert_loads, biases, eps=1e-6):
         </div>
 
         <p>让我分享一个亲身经历的"踩坑"故事。在DeepSeek-V3论文发布之前，我们团队曾经花了整整两个月手动调参辅助损失的权重α。我们采用了网格搜索：从0.001到0.1，每次调一个数量级。结果发现，α=0.01时负载均衡不错但MMLU掉了一个点，α=0.001时主任务性能回来了但负载又开始倾斜。我们甚至尝试了动态α调度——前10%的训练步数用大α，后面逐渐衰减到零。这个方法效果尚可，但实现极其复杂，而且每次换数据集就要重新搜索α。当DeepSeek-V3的ALF-LB方案出来后，我们组的一个同学花了三天时间把它移植到了我们的模型上，结果负载均衡和主任务性能同时达到了最优。那位同学开玩笑说："我们两个月的调参，被人家三行代码取代了。" 这就是好的研究带来的冲击——用简单的方案解决复杂的问题。</p>
+
+        <div class="math-equation" role="group" aria-label="ALF-LB 路由评分与 bias 更新">
+            <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="ALF-LB 公式，可横向滚动">
+                <math display="block" aria-label="调整后的路由得分等于原始得分加上 bias b_i；bias 更新为 b_i 加上 gamma 乘 sign(e_i)，其中 e_i 是目标负载减实际负载">
+                    <mtable>
+                        <mtr><mtd><msub><mover><mi>s</mi><mo>^</mo></mover><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>b</mi><mi>i</mi></msub></mtd></mtr>
+                        <mtr><mtd><msub><mi>b</mi><mi>i</mi></msub><mo>←</mo><msub><mi>b</mi><mi>i</mi></msub><mo>+</mo><mi>γ</mi><mo>·</mo><mi>sign</mi><mo stretchy="false">(</mo><msub><mi>e</mi><mi>i</mi></msub><mo stretchy="false">)</mo><mo>,</mo><mspace width="0.5em"/><msub><mi>e</mi><mi>i</mi></msub><mo>=</mo><mover><mi>load</mi><mo>¯</mo></mover><mo>−</mo><msub><mi>load</mi><mi>i</mi></msub></mtd></mtr>
+                    </mtable>
+                </math>
+            </div>
+        </div>
+
+        <p>即：路由得分加上一个只影响选择的 bias <math class="math-inline" aria-label="b_i"><msub><mi>b</mi><mi>i</mi></msub></math>；若某专家负载低于平均（<math class="math-inline" aria-label="e_i 大于 0"><msub><mi>e</mi><mi>i</mi></msub><mo>&gt;</mo><mn>0</mn></math>）则抬高其 bias，反之压低。<strong>说明：</strong>上式是与 DeepSeek-V3 算法一致的<strong>教学形式</strong>，论文中 bias 的具体更新常量与符号约定以原文为准。</p>
 
         <h2>MTP多Token预测：让MoE更懂推理</h2>
 
@@ -266,6 +327,36 @@ def fp8_linear_forward(x, weight, scale_x, scale_w):
             <strong>⚠️ 实战经验：</strong> FP8 训练虽然高效，但如果直接复现而不注意以下三个陷阱，很容易翻车：(1) 块大小选择——块太大则量化误差累积，块太小则缩放因子的存储开销反噬收益，H800 上 128 是一个经验值；(2) 梯度裁剪——FP8 的动态范围有限（E5M2 仅约 32 倍动态范围），梯度爆炸在 FP8 下会直接溢出，必须在量化前做梯度裁剪；(3) 某些算子（如 attention softmax）不应量化，保持 BF16 计算即可。我们在将 DeepSeek-V3 的 FP8 方案移植到另一个模型时，曾因为 RMSNorm 的输出分布过于集中导致量化后信息丢失，模型 loss 直接飞了——排查了两天才发现。
         </div>
 
+        <h2>FP8全链路训练：算力与精度的平衡</h2>
+
+        <div class="moe-widget" id="fp8-demo">
+            <p class="widget-q"><strong>交互：</strong>切换训练精度，比较同规模模型的有效吞吐（相对值）。</p>
+            <div class="controls" role="group" aria-label="选择训练精度">
+                <button type="button" data-p="bf16" aria-pressed="true">BF16</button>
+                <button type="button" data-p="fp8" aria-pressed="false">FP8 全链路</button>
+            </div>
+            <p class="widget-output" aria-live="polite">BF16：基准有效吞吐记为 1.00×。</p>
+        </div>
+        <script>
+        (function () {
+            var root = document.getElementById('fp8-demo');
+            if (!root) return;
+            var out = root.querySelector('.widget-output');
+            var map = {
+                bf16: 'BF16：基准有效吞吐记为 1.00×。',
+                fp8: 'FP8 全链路（块级量化 + 混合精度累加）：有效吞吐约 1.40×（+40%）。'
+            };
+            var btns = root.querySelectorAll('button');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', 'false');
+                    this.setAttribute('aria-pressed', 'true');
+                    out.textContent = map[this.getAttribute('data-p')];
+                });
+            }
+        })();
+        </script>
+
         <p>站在今天回看DeepSeek-V3的这三个创新，你会发现一个共同的工程哲学：<strong>在系统的每个环节寻找"浪费"，然后用极其精确的方式消除它</strong>。辅助损失在梯度层面的浪费，通过ALF-LB消除；单token预测在信号密度上的浪费，通过MTP弥补；FP16在计算吞吐上的浪费，通过FP8压缩。每一个创新都不是"新发明一个东西"，而是"发现已有的东西哪里不完美，然后修复它"。</p>
 
         <p>这让我想起了一个故事。有一次，我们团队的实习生在读完DeepSeek-V3论文后很沮丧，跑来跟我说："老师，他们做的东西我全都知道原理，但这些组合起来的效果为什么我们就是做不出来？" 我告诉他：顶级的研究往往不是藏在一个你不知道的秘密公式里，而是藏在那些你明明知道但从来没认真对待的细节里。DeepSeek-V3是一个教科书般的案例——它教会我们的不仅是技术本身，更是一种"在成本约束下追求极致效率"的思维方式。</p>
@@ -277,7 +368,18 @@ def fp8_linear_forward(x, weight, scale_x, scale_w):
             <a href="index.html">📖 返回目录</a>
             <a href="16.html">下一章 →</a>
         </div>
-    </div>
+
+        <section id="references" class="references" aria-labelledby="refs-h">
+            <h2 id="refs-h">本章引用与出处</h2>
+            <ol>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（ALF-LB、MTP、FP8、成本数据）</li>
+                <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（辅助损失）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V2</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a></li>
+            </ol>
+            <p>「671B / 37B」「2.788M H800 GPU 小时」「$5.576M」引自 DeepSeek-V3 技术报告及仓内 <code>pdfs/08_DeepSeek-V3_2024_Liu.pdf</code>。图中控制环与 FP8 吞吐倍数（+40%）为<strong>教学示意/简化</strong>；bias 更新公式为与论文算法一致的<strong>教学形式</strong>。</p>
+        </section>
+    </article>
+    </main>
 </div>
 </div>
 </body>
