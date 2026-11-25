@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <meta name="description" content="从「分而治之、按需调用」的直觉出发，理解 MoE 为何能在参数规模与计算成本之间解耦，并沿 1991→2026 时间线建立课程概念坐标。">
     <title>第1章 MoE概述与演进史</title>
     <link rel="stylesheet" href="theme.css">
     <style>
@@ -20,7 +21,7 @@
     <nav class="sidebar" aria-label="课程目录">
         <h3>🤖 课程目录</h3>
         <ul class="chapter-list">
-            <li><a href="01.html" class="active">第1章 MoE概述与演进史</a></li>
+            <li><a href="01.html" class="active" aria-current="page">第1章 MoE概述与演进史</a></li>
             <li><a href="02.html">第2章 1991理论鼻祖：Adaptive Mixture of Local Experts</a></li>
             <li><a href="03.html">第3章 条件计算与稀疏激活原理</a></li>
             <li><a href="04.html">第4章 2017开山之作：Sparsely-Gated MoE (上)</a></li>
@@ -428,7 +429,7 @@ def moe_forward(x, experts, router):
         <p>OK，这一章的铺垫就到这里。我们从"为什么需要MoE"这个宏观问题出发，浏览了MoE的基本概念、35年的发展历程，以及一套贯穿全书的术语体系。站在这个起点上，下一章我们将带着时间机器倒回1991年，去拜读 Jacobs, Jordan 和 Hinton 三位大神提出的MoE理论鼻祖——"Adaptive Mixture of Local Experts"。你会发现，1991年的那个简单直觉，如何演变成了今天改变整个大模型产业的技术力量。</p>
 
         <div class="footer-nav">
-            <a href="javascript:void(0)">← 上一章</a>
+            <span class="nav-disabled" aria-disabled="true">← 上一章</span>
             <a href="index.html">📖 返回目录</a>
             <a href="02.html">下一章 →</a>
         </div>
