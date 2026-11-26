@@ -279,6 +279,50 @@ def mtp_forward(hidden_states, mtp_heads, num_future_tokens=2):
             <strong>🔑 关键洞察：</strong> MTP 并不是 DeepSeek 首创的想法，之前的学术研究中已经有多 token 预测的相关探索。但 DeepSeek-V3 的贡献在于：(1) 把 MTP 真正用到了千亿级 MoE 模型的训练中并验证了其有效性；(2) 提出级联预测头结构，让多 token 预测之间可以相互利用信息；(3) 将 MTP 与推测解码结合，把训练阶段的"额外付出"变成了推理阶段的"效率红利"。这是一个典型的"训练多花一点、推理省一大截"的工程智慧。
         </div>
 
+        <figure>
+            <svg viewBox="0 0 820 300" role="img" aria-labelledby="fig-mtp-title fig-mtp-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-mtp-title">MTP 级联预测头：逐级预测未来多个 token</title>
+                <desc id="fig-mtp-desc">主干隐藏状态送入第 1 个预测头预测第 t+1 个 token；其输出经线性投影后与主干状态相加，作为第 2 个预测头的输入以预测第 t+2 个 token，依此类推。每个预测头不是独立工作，而是共享前一级的信息。</desc>
+                <g stroke-width="2">
+                    <rect x="16" y="34" width="118" height="46" rx="10" fill="#ecfeff" stroke="#147f80"/>
+                    <rect x="182" y="34" width="120" height="46" rx="10" fill="#f5f3ff" stroke="#7c3aed"/>
+                    <rect x="182" y="132" width="120" height="46" rx="10" fill="#f5f3ff" stroke="#7c3aed"/>
+                    <rect x="182" y="230" width="120" height="46" rx="10" fill="#f5f3ff" stroke="#7c3aed"/>
+                    <rect x="356" y="34" width="130" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                    <rect x="356" y="132" width="130" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                    <rect x="356" y="230" width="130" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                </g>
+                <g font-size="13" text-anchor="middle">
+                    <text x="75" y="62" fill="#0f4c4a">主干状态 h_t</text>
+                    <text x="242" y="62" fill="#4c1d95">主干输出</text>
+                    <text x="242" y="160" fill="#4c1d95">h_t ⊕ p₁</text>
+                    <text x="242" y="258" fill="#4c1d95">h_t ⊕ p₂</text>
+                    <text x="421" y="62" fill="#3730a3">MTP Head 1</text>
+                    <text x="421" y="160" fill="#3730a3">MTP Head 2</text>
+                    <text x="421" y="258" fill="#3730a3">MTP Head 3</text>
+                    <text x="560" y="62" fill="#475569" text-anchor="start">→ 预测 t+1</text>
+                    <text x="560" y="160" fill="#475569" text-anchor="start">→ 预测 t+2</text>
+                    <text x="560" y="258" fill="#475569" text-anchor="start">→ 预测 t+3</text>
+                </g>
+                <g stroke="#94a3b8" stroke-width="2" fill="none">
+                    <path d="M134 57 H178"/><path d="M302 57 H352"/>
+                    <path d="M421 80 C421 108 320 110 250 128"/>
+                    <path d="M302 155 H352"/>
+                    <path d="M421 178 C421 206 320 208 250 226"/>
+                    <path d="M302 253 H352"/>
+                </g>
+                <g fill="#64748b">
+                    <path d="M178 51 l-12 6 12 6 z"/><path d="M352 51 l-12 6 12 6 z"/>
+                    <path d="M352 149 l-12 6 12 6 z"/><path d="M352 247 l-12 6 12 6 z"/>
+                    <path d="M242 132 l-6 -12 12 0 z"/><path d="M242 230 l-6 -12 12 0 z"/>
+                </g>
+                <text x="560" y="110" font-size="12" fill="#6d28d9">线性投影 p₁</text>
+                <text x="560" y="208" font-size="12" fill="#6d28d9">线性投影 p₂</text>
+                <text x="75" y="100" font-size="12" fill="#475569" text-anchor="middle">第 t 步</text>
+            </svg>
+            <figcaption><span class="fig-num">图 2</span> MTP 的级联预测头：每一级的输出经线性投影后并入下一级输入，使多个「未来 token」的预测彼此共享信息，而不是各自独立。训练时每一级都产生一个损失，推理时可复用为推测解码的草稿头。</figcaption>
+        </figure>
+
         <h2>FP8全链路训练：算力与精度的平衡</h2>
 
         <p>DeepSeek-V3的第三个技术创新是<strong>FP8全链路训练</strong>。在它之前，FP8训练更多地停留在研究阶段——虽然NVIDIA H100 GPU原生支持FP8计算，但业界对FP8训练的普遍担忧是精度损失。通常的做法是：只在部分算子中使用FP8（如矩阵乘法），而在关键路径上保留FP16/BF16。</p>
@@ -328,7 +372,7 @@ def fp8_linear_forward(x, weight, scale_x, scale_w):
             <strong>⚠️ 实战经验：</strong> FP8 训练虽然高效，但如果直接复现而不注意以下三个陷阱，很容易翻车：(1) 块大小选择——块太大则量化误差累积，块太小则缩放因子的存储开销反噬收益，H800 上 128 是一个经验值；(2) 梯度裁剪——FP8 的动态范围有限（E5M2 仅约 32 倍动态范围），梯度爆炸在 FP8 下会直接溢出，必须在量化前做梯度裁剪；(3) 某些算子（如 attention softmax）不应量化，保持 BF16 计算即可。我们在将 DeepSeek-V3 的 FP8 方案移植到另一个模型时，曾因为 RMSNorm 的输出分布过于集中导致量化后信息丢失，模型 loss 直接飞了——排查了两天才发现。
         </div>
 
-        <h2>FP8全链路训练：算力与精度的平衡</h2>
+        <h3>交互：FP8 与 BF16 的有效吞吐对照</h3>
 
         <div class="moe-widget" id="fp8-demo">
             <p class="widget-q"><strong>交互：</strong>切换训练精度，比较同规模模型的有效吞吐（相对值）。</p>
