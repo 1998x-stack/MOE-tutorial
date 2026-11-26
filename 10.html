@@ -193,6 +193,46 @@ def train_step(batch, model, mesh):
 
         <p>All-to-All通信的操作语义是：集群中有D个设备，每个设备维护D个缓冲区（每个目标设备一个），通过一次集体通信操作，所有设备将自己的数据发送给其他设备，同时接收来自其他设备的数据。数学上，这等价于一次<strong>矩阵转置</strong>操作——每个设备是矩阵的一行，发送数据到对应的列位置。</p>
 
+        <figure>
+            <svg viewBox="0 0 840 340" role="img" aria-labelledby="fig-a2a-title fig-a2a-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
+                <title id="fig-a2a-title">专家并行的 All-to-All 通信：Dispatch 与 Combine</title>
+                <desc id="fig-a2a-desc">每台设备先按路由结果把属于远端专家的 token 通过 All-to-All 发出（Dispatch），各设备用本地专家计算后再把结果按原路送回（Combine）。发送与接收同时发生，等价于一次矩阵转置。</desc>
+                <g stroke-width="2">
+                    <rect x="30" y="70" width="300" height="200" rx="14" fill="#ffffff" stroke="#94a3b8"/>
+                    <rect x="510" y="70" width="300" height="200" rx="14" fill="#ffffff" stroke="#94a3b8"/>
+                    <rect x="60" y="150" width="110" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                    <rect x="190" y="150" width="110" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                    <rect x="540" y="150" width="110" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                    <rect x="670" y="150" width="110" height="46" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+                </g>
+                <g font-size="13" text-anchor="middle">
+                    <text x="180" y="96" fill="#1e1b4b" font-weight="700">设备 0（本地专家 E0, E1）</text>
+                    <text x="660" y="96" fill="#1e1b4b" font-weight="700">设备 1（本地专家 E2, E3）</text>
+                    <text x="115" y="178" fill="#3730a3">E0</text>
+                    <text x="245" y="178" fill="#3730a3">E1</text>
+                    <text x="595" y="178" fill="#3730a3">E2</text>
+                    <text x="725" y="178" fill="#3730a3">E3</text>
+                    <text x="180" y="232" fill="#0f4c4a" font-size="12">本地 token 直接计算，无需传输</text>
+                    <text x="660" y="232" fill="#0f4c4a" font-size="12">本地 token 直接计算，无需传输</text>
+                </g>
+                <g stroke="#7c3aed" stroke-width="2" fill="none">
+                    <path d="M330 110 H504"/>
+                    <path d="M510 220 H336"/>
+                </g>
+                <g fill="#7c3aed">
+                    <path d="M504 104 l-12 6 12 6 z"/>
+                    <path d="M336 214 l12 6 -12 6 z"/>
+                </g>
+                <g font-size="12" text-anchor="middle">
+                    <text x="420" y="98" fill="#6d28d9">① Dispatch：token → 远端专家</text>
+                    <text x="420" y="205" fill="#6d28d9">③ Combine：结果按原路返回</text>
+                </g>
+                <text x="420" y="170" font-size="12" text-anchor="middle" fill="#475569">② 各设备用本地专家计算</text>
+                <text x="420" y="310" font-size="12" text-anchor="middle" fill="#475569">All-to-All：发送与接收同时发生，等价于矩阵转置</text>
+            </svg>
+            <figcaption><span class="fig-num">图 2</span> 专家并行的三段流程：Dispatch 把属于远端专家的 token 发出去，本地专家计算后，Combine 再把结果按原路送回并加权求和。通信量由「被路由到远端设备的 token 数 × 隐藏维度」决定，而不是由总 token 数决定。</figcaption>
+        </figure>
+
         <p>All-to-All的时间开销可以用下面的公式近似估算：</p>
 
         <div class="math-equation" role="group" aria-label="All-to-All 时间开销公式">
