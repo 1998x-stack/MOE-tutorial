@@ -41,6 +41,16 @@ body {
     margin-bottom: 25px;
 }
 
+/* 侧栏标题：视觉上与旧 h3 一致，但不参与文档标题层级,
+   避免导航标题(h3)出现在正文 h1 之前而破坏标题顺序。 */
+.sidebar-title {
+    font-size: 1.4rem; font-weight: 700;
+    color: #6d28d9;
+    border-left: 5px solid #8b5cf6;
+    padding-left: 15px;
+    margin-bottom: 25px;
+}
+
 .chapter-list { list-style: none; }
 .chapter-list li { margin-bottom: 6px; }
 
