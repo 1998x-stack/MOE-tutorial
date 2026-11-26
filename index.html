@@ -332,7 +332,148 @@
     </figure>
 
     <h2 id="catalog-h">章节目录</h2>
-    <div id="cardContainer" class="course-grid"></div>
+    <div id="cardContainer" class="course-grid">
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">01</span><span class="card-title">MoE概述与演进史</span></div>
+        <ul class="topic-list"><li>MoE核心思想</li><li>发展时间线</li><li>为什么需要MoE</li></ul>
+        <div class="card-footer"><a href="01.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">02</span><span class="card-title">1991理论鼻祖：Adaptive Mixture of Local Experts</span></div>
+        <ul class="topic-list"><li>门控网络Gating</li><li>专家子网络Expert</li><li>局部学习</li></ul>
+        <div class="card-footer"><a href="02.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">03</span><span class="card-title">条件计算与稀疏激活原理</span></div>
+        <ul class="topic-list"><li>条件计算</li><li>Top-K路由</li><li>稀疏激活vs稠密激活</li></ul>
+        <div class="card-footer"><a href="03.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">04</span><span class="card-title">2017开山之作：Sparsely-Gated MoE (上)</span></div>
+        <ul class="topic-list"><li>Noisy Top-K Gating</li><li>专家容量</li><li>负载均衡损失</li></ul>
+        <div class="card-footer"><a href="04.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">05</span><span class="card-title">2017开山之作：Sparsely-Gated MoE (下)</span></div>
+        <ul class="topic-list"><li>MoE层替换FFN</li><li>训练稳定性</li><li>大规模实验</li></ul>
+        <div class="card-footer"><a href="05.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">06</span><span class="card-title">路由机制全景：Token-Choice vs Expert-Choice</span></div>
+        <ul class="topic-list"><li>Token选择专家</li><li>专家选择Token</li><li>全局分配</li></ul>
+        <div class="card-footer"><a href="06.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">07</span><span class="card-title">负载均衡理论与方法</span></div>
+        <ul class="topic-list"><li>辅助损失</li><li>Capacity Factor</li><li>专家坍缩</li></ul>
+        <div class="card-footer"><a href="07.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">08</span><span class="card-title">Switch Transformer：极简单专家路由</span></div>
+        <ul class="topic-list"><li>Top-1路由</li><li>Capacity Factor实战</li><li>万亿参数</li></ul>
+        <div class="card-footer"><a href="08.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">09</span><span class="card-title">GShard：分布式MoE工程基石</span></div>
+        <ul class="topic-list"><li>自动分片</li><li>专家并行</li><li>跨设备通信</li></ul>
+        <div class="card-footer"><a href="09.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">10</span><span class="card-title">专家并行与通信优化</span></div>
+        <ul class="topic-list"><li>All-to-All通信</li><li>专家放置</li><li>拓扑感知</li></ul>
+        <div class="card-footer"><a href="10.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">11</span><span class="card-title">Mixtral：开源轻量化MoE标杆</span></div>
+        <ul class="topic-list"><li>Top-2路由</li><li>无辅助损失</li><li>推理成本优势</li></ul>
+        <div class="card-footer"><a href="11.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">12</span><span class="card-title">DeepSeekMoE：专家专业化创新 (上)</span></div>
+        <ul class="topic-list"><li>共享专家+路由专家分离</li><li>知识冗余消除</li><li>细粒度切分</li></ul>
+        <div class="card-footer"><a href="12.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">13</span><span class="card-title">DeepSeekMoE：专家专业化创新 (下)</span></div>
+        <ul class="topic-list"><li>细粒度路由</li><li>激活策略</li><li>性能碾压分析</li></ul>
+        <div class="card-footer"><a href="13.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">14</span><span class="card-title">DeepSeek-V2: MoE+长文本工业集大成</span></div>
+        <ul class="topic-list"><li>MLA注意力</li><li>KV Cache压缩</li><li>128K上下文</li></ul>
+        <div class="card-footer"><a href="14.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">15</span><span class="card-title">DeepSeek-V3：无损负载均衡新范式</span></div>
+        <ul class="topic-list"><li>移除辅助损失</li><li>MTP多Token预测</li><li>FP8训练</li></ul>
+        <div class="card-footer"><a href="15.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">16</span><span class="card-title">辅助损失-free负载均衡深度剖析</span></div>
+        <ul class="topic-list"><li>ALF-LB算法</li><li>动态bias调整</li><li>原对偶理论</li></ul>
+        <div class="card-footer"><a href="16.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">17</span><span class="card-title">多任务MoE：MMoE与任务专属门控</span></div>
+        <ul class="topic-list"><li>多任务学习</li><li>task-specific gating</li><li>推荐系统</li></ul>
+        <div class="card-footer"><a href="17.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">18</span><span class="card-title">异构MoE与开放MoE生态</span></div>
+        <ul class="topic-list"><li>DBRX异构专家</li><li>OLMoE开源可复现</li><li>MegaBlocks</li></ul>
+        <div class="card-footer"><a href="18.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">19</span><span class="card-title">专家专业化与知识聚合的博弈</span></div>
+        <ul class="topic-list"><li>专家重叠度</li><li>知识冗余度量</li><li>专家归并</li></ul>
+        <div class="card-footer"><a href="19.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">20</span><span class="card-title">路由几何理论与专家耦合</span></div>
+        <ul class="topic-list"><li>几何耦合</li><li>router-expert梯度对齐</li><li>K-Means路由</li></ul>
+        <div class="card-footer"><a href="20.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">21</span><span class="card-title">时间记忆与预测性路由</span></div>
+        <ul class="topic-list"><li>LIF脉冲神经动力学</li><li>精度加权门控</li><li>域迁移</li></ul>
+        <div class="card-footer"><a href="21.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">22</span><span class="card-title">专家可解释性与语义发现</span></div>
+        <ul class="topic-list"><li>单语义专家</li><li>频率→语法梯度</li><li>因果干预</li></ul>
+        <div class="card-footer"><a href="22.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">23</span><span class="card-title">MoE推理优化：Prefill与Decode</span></div>
+        <ul class="topic-list"><li>Prefill-Decode分离</li><li>专家预取</li><li>投机推理</li></ul>
+        <div class="card-footer"><a href="23.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">24</span><span class="card-title">消费级硬件部署MoE</span></div>
+        <ul class="topic-list"><li>CPU-GPU协同</li><li>SSD流式加载</li><li>量化策略</li></ul>
+        <div class="card-footer"><a href="24.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">25</span><span class="card-title">自适应路由与动态推理</span></div>
+        <ul class="topic-list"><li>Adaptive-K</li><li>熵引导</li><li>动态Top-K</li><li>无重训练</li></ul>
+        <div class="card-footer"><a href="25.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">26</span><span class="card-title">MoE训练实战：从零搭建稀疏模型</span></div>
+        <ul class="topic-list"><li>PyTorch MoE实现</li><li>训练脚本</li><li>调参经验</li></ul>
+        <div class="card-footer"><a href="26.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">27</span><span class="card-title">2025-2026前沿与未来方向</span></div>
+        <ul class="topic-list"><li>mHC流形约束</li><li>MoE Lens</li><li>移动端MoE</li></ul>
+        <div class="card-footer"><a href="27.html">开始学习</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="chapter-num">28</span><span class="card-title">综合项目：构建领域MoE专家系统</span></div>
+        <ul class="topic-list"><li>项目设计</li><li>数据准备</li><li>训练评估</li><li>部署</li></ul>
+        <div class="card-footer"><a href="28.html">开始学习</a></div>
+      </div>
+    </div>
 
     <section id="sources-h" class="references" aria-labelledby="sources-title">
         <h2 id="sources-title">主要原始文献</h2>
@@ -377,7 +518,6 @@
                 footerEl.innerHTML = '<span>' + data.chapterCount + '章</span> 实战体系 · 从入门到精通';
 
                 if (!data.chapters || data.chapters.length === 0) {
-                    showError('暂无课程数据');
                     return;
                 }
 
@@ -424,14 +564,18 @@
                 });
             })
             .catch(function(err) {
-                showError('课程数据加载失败: ' + err.message + '。请刷新页面重试。');
+                // 目录已在 HTML 中静态渲染，无 JS / file:// 环境下 fetch 失败不影响浏览；
+                // 仅当静态目录缺失时才提示错误。
+                if (!container.querySelector('.card')) {
+                    showError('课程数据加载失败: ' + err.message + '。请刷新页面重试。');
+                }
             });
     })();
 </script>
 
 <noscript>
     <div style="background:#fcf0d9; padding:1rem; border-radius:20px; text-align:center; color:#92400e;">
-        请启用 JavaScript 以浏览课程目录。
+        已静态渲染全部 28 章目录，无需 JavaScript 即可浏览。
     </div>
 </noscript>
 </body>
