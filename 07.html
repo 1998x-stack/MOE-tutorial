@@ -222,11 +222,11 @@ def load_balancing_loss(gate_output, tokens_per_expert, num_experts):
                     <td>学术研究</td>
                 </tr>
                 <tr>
-                    <td>Z-loss（DeepSeek-V3）</td>
+                    <td>Z-loss（ST-MoE）</td>
                     <td>α·(∑log²(∑exp(g)))</td>
-                    <td>稳定训练, 无额外计算</td>
-                    <td>相对较新, 验证少</td>
-                    <td>DeepSeek-V3</td>
+                    <td>稳定训练, 几乎无额外计算</td>
+                    <td>需设系数, 过强会压制路由选择性</td>
+                    <td>ST-MoE 引入，Switch / DeepSeek-V3 等沿用</td>
                 </tr>
             </tbody>
         </table>
@@ -428,7 +428,7 @@ def capacity_factor_analysis(drop_rate_threshold=0.01):
                     <td>路由Z-loss</td>
                     <td>约束门控logits的尺度，防止数值失衡</td>
                     <td>训练中</td>
-                    <td>好（DeepSeek-V3方案）</td>
+                    <td>好（ST-MoE 引入，Switch/V3 沿用）</td>
                 </tr>
                 <tr>
                     <td>辅助专家（Auxiliary Expert）</td>
@@ -466,7 +466,8 @@ def capacity_factor_analysis(drop_rate_threshold=0.01):
             <ol>
                 <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（重要度-权重辅助损失）</li>
                 <li>Fedus 等，<em>Switch Transformers</em>，2021。<a href="https://arxiv.org/abs/2101.03961">arXiv:2101.03961</a>（CV 形式负载损失）</li>
-                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（z-loss / 无辅助损失均衡）</li>
+                <li>Zoph 等，<em>ST-MoE: Designing Stable and Transferable Sparse Expert Models</em>，2022。<a href="https://arxiv.org/abs/2202.08906">arXiv:2202.08906</a>（router z-loss 的原始出处）</li>
+                <li>DeepSeek-AI，<em>DeepSeek-V3 Technical Report</em>，2024。<a href="https://arxiv.org/abs/2412.19437">arXiv:2412.19437</a>（无辅助损失均衡）</li>
             </ol>
             <p>辅助损失的三种写法与防治手段对照表为<strong>教学整理</strong>（已作简化）；文中代码的模拟值、CV 阈值（0.1/0.5/0.8）与「三七法则」均为<strong>教学示意/经验总结</strong>，不代表论文实测结论。</p>
         </section>
