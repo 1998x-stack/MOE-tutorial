@@ -242,7 +242,7 @@ class MMoELayer(nn.Module):
 
         <p>这里解释一下OMoE（One MoE）：它其实就是MoE层+单一共享门控——和我们前几章讨论的语言模型中的MoE层是一样的。对于多任务学习，OMoE只是用了一个全局门控，不区分任务。这比Shared-Bottom好，因为专家可以分化出不同的技能，但缺点也很明显：<strong>如果任务A需要的专家组合和任务B冲突，共享门控就陷入两难</strong>。</p>
 
-        <p>为了直观理解这三种架构的差异，我们看一个具体的数字对比：在Google的YouTube推荐系统基准上，三者的AUC表现如下：</p>
+        <p>为了直观理解这三种架构的差异，我们看一个具体的数字对比。需说明：下表的 CTR/观看时长/互动率 AUC 为<strong>教学示意数值</strong>，用于展示 Shared-Bottom → OMoE → MMoE 的相对排序，<strong>非 Ma 等 2018 论文实测</strong>（原文实验基于合成数据与 Census-income 数据集）。</p>
 
         <table>
             <thead>
@@ -281,7 +281,7 @@ class MMoELayer(nn.Module):
             </tbody>
         </table>
 
-        <p>这些数字看起来提升不大，但在推荐系统中，AUC每提升0.1%都可能意味着数百万美元的营收变化。MMoE相比Shared-Bottom的全任务平均提升1.7%，这在工业场景中是一个巨大的收益。</p>
+        <p>这些数字看起来提升不大，但在推荐系统中，AUC每提升0.1%都可能意味着数百万美元的营收变化（上表为教学示意）。MMoE相比Shared-Bottom的全任务相对排序更优，这在工业场景中意味着显著收益。</p>
 
         <div class="moe-widget" id="mmoe-demo">
             <p class="widget-q"><strong>交互：</strong>切换三种多任务架构，比较门控数量、任务干扰程度与相对基线（Shared-Bottom）的平均 AUC 增益。</p>
@@ -380,7 +380,7 @@ model_config = {
                 <li>Tang 等，<em>Progressive Layered Extraction (PLE)</em>，RecSys 2020（MMoE 在工业推荐中的改良）</li>
                 <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（MoE 基础）</li>
             </ol>
-            <p>MMoE/OMoE/Shared-Bottom 的架构对比与 YouTube 推荐验证引自 Ma 等原文及仓内 <code>pdfs/09_MMoE_2018_Ma.pdf</code>。文中 AUC 提升（平均 +1.7%）来自论文表格的<strong>教学引用</strong>；「正交化约束」与「四个任务踩坑」的故事为<strong>教学示意</strong>。</p>
+            <p>MMoE/OMoE/Shared-Bottom 的架构对比引自 Ma 等原文及仓内 <code>pdfs/09_MMoE_2018_Ma.pdf</code>。文中 CTR/观看时长/互动率 AUC 表与平均提升为<strong>教学示意</strong>，非论文实测（原文实验基于合成数据与 Census-income）；「正交化约束」与「四个任务踩坑」的故事为<strong>教学示意</strong>。</p>
         </section>
     </article>
     </main>
