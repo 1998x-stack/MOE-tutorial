@@ -161,6 +161,27 @@ class MoELayer(nn.Module):
 
         return output.view(b, s, d)</code></pre>
 
+        <p>在依赖这套代码之前，先加一小段确定性的自检，把"形状不变、每 token 恰好激活 top_k 个专家、数值有限"这三件事固定下来（无 GPU 也能跑）：</p>
+
+        <pre><code># 形状与稀疏性自检（确定性，CPU 可跑）
+def test_moe_layer():
+    torch.manual_seed(0)
+    moe = MoELayer(d_model=64, num_experts=8, top_k=2)
+    x = torch.randn(4, 16, 64)          # [batch, seq, d_model]
+    y = moe(x)
+
+    assert y.shape == x.shape, '输出形状应与输入一致'
+    assert torch.isfinite(y).all(), '前向不得产生 NaN/Inf'
+
+    # 每个 token 恰好被路由到 top_k 个专家
+    logits = moe.router(x.view(-1, 64))  # [b*s, E]
+    topk = logits.topk(moe.top_k, dim=-1).indices
+    assert topk.shape == (4 * 16, 2), '每个 token 应选中 top_k=2 个专家'
+
+    # 门控权重（重归一化后）应非负且每行和为 1
+    w = F.softmax(logits.topk(moe.top_k, dim=-1).values, dim=-1)
+    assert torch.allclose(w.sum(dim=-1), torch.ones(4 * 16), atol=1e-5)</code></pre>
+
         <p>这段代码虽然只有40行，但它把MoE的骨架完整地搭出来了。让我逐段拆解一下实现思路。</p>
 
         <p>首先是门控网络 <code>router</code>：这里只是一个不加bias的线性层，输入维度是 <code>d_model</code>，输出维度是专家数量 <code>num_experts</code>。它的任务就是为每个token算出一组分数，衡量"这个token和每个专家的匹配程度"。有人可能会问：为什么不用bias？实践中，不加bias能让路由更稳定，因为bias会引入一个与输入无关的偏移量，容易导致某些专家被"默认偏好"。这是Shazeer等人在2017年论文中就注意到的小技巧。</p>
