@@ -61,7 +61,7 @@
 
         <p>大家好，我是你们的讲师。上一章我们聊了Switch Transformer如何用Top-1路由把MoE推向万亿参数。但有一个关键问题我们没来得及细说：一个万亿参数的MoE模型，是怎么在2048个TPU核心上训练起来的？答案就是——<strong>GShard</strong>。</p>
 
-        <p>GShard是Google在2020年发表在<em>EMNLP 2020</em>上的一篇论文，由Dmitry Lepikhin、Younghun Lee、Yuanzhong Xu等人共同完成。它的全称是"GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding"。但这篇论文的重要性远远超出了一篇"系统论文"的范畴：它首次提出了<strong>专家并行（Expert Parallelism）</strong>的概念，为后续所有大规模MoE训练框架奠定了工程基础。</p>
+        <p>GShard 是 Google 在 2020 年公开（arXiv 编号 2006.16668）、后正式发表于 <em>ICLR 2021</em> 的一篇论文，由 Dmitry Lepikhin、HyoukJoong Lee、Yuanzhong Xu 等人共同完成。它的全称是"GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding"。但这篇论文的重要性远远超出了一篇"系统论文"的范畴：它首次提出了<strong>专家并行（Expert Parallelism）</strong>的概念，为后续所有大规模MoE训练框架奠定了工程基础。</p>
 
         <p>如果你把MoE的发展史比作建造摩天大楼，那么Switch Transformer是那个设计蓝图的人，而GShard则是那个建造地基和钢架的人。没有GShard的分布式基础设施，MoE永远只能停留在学术论文的仿真实验中。</p>
 
