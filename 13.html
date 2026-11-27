@@ -190,7 +190,7 @@ class FineGrainedRouter(torch.nn.Module):
 
         <p>DeepSeekMoE的关键发现是：<strong>激活专家数量不是越多越好</strong>。在总计算预算固定的情况下，存在一个最优的K值。如果K太小（如2-3），每个token接触的专家太少，知识覆盖面不够；如果K太大（如15-20），路由选择的"区分度"下降——因为大量专家都被选中，相当于退化为稠密模型。</p>
 
-        <p>针对16B参数的DeepSeekMoE模型，作者发现在64个路由专家中选6-8个是最优的。这个数字和总专家数的比例（约10%）为后续模型设计提供了重要参考。</p>
+        <p>针对16B参数的DeepSeekMoE模型，作者发现在2个共享专家之外、从64个路由专家中激活6个是最优的（论文 §5.1）。这个数字和总专家数的比例（约10%）为后续模型设计提供了重要参考。</p>
 
         <div class="tip">
             <strong>💡 实用建议：</strong> 在设计你自己的 MoE 模型时，可以用以下公式估算最优的激活专家数 K：K ≈ 0.1 × N_routed + 2，其中 N_routed 是路由专家总数。这个经验公式来自 DeepSeekMoE 的实验结果，在 16-128 个专家的范围内适用性较好。当然，最佳实践还是多做几组消融实验来确定。
@@ -246,53 +246,43 @@ class FineGrainedRouter(torch.nn.Module):
             <tbody>
                 <tr>
                     <td>DeepSeekMoE 16B</td>
-                    <td>16B</td>
-                    <td>~2B</td>
-                    <td>500B tokens</td>
-                    <td><strong>44.2</strong></td>
-                    <td><strong>54.6</strong></td>
-                    <td><strong>22.1</strong></td>
+                    <td>16.4B</td>
+                    <td>2.8B</td>
+                    <td>2T tokens</td>
+                    <td>45.0</td>
+                    <td><strong>40.6</strong></td>
+                    <td><strong>18.8</strong></td>
                     <td><strong>26.8</strong></td>
                 </tr>
                 <tr>
-                    <td>GShard 16B × 2</td>
-                    <td>32B</td>
-                    <td>~16B</td>
-                    <td>500B tokens</td>
-                    <td>39.8</td>
-                    <td>40.1</td>
-                    <td>9.7</td>
-                    <td>12.2</td>
+                    <td>DeepSeek 7B（稠密）</td>
+                    <td>6.9B</td>
+                    <td>6.9B</td>
+                    <td>2T tokens</td>
+                    <td><strong>48.2</strong></td>
+                    <td>45.0</td>
+                    <td>17.4</td>
+                    <td>26.2</td>
                 </tr>
                 <tr>
-                    <td>Switch Transformer 16B</td>
-                    <td>16B</td>
-                    <td>~1.7B</td>
-                    <td>500B tokens</td>
-                    <td>34.2</td>
-                    <td>33.3</td>
-                    <td>9.1</td>
-                    <td>10.4</td>
-                </tr>
-                <tr>
-                    <td>Dense LLaMA 7B</td>
-                    <td>7B</td>
-                    <td>7B</td>
-                    <td>1T tokens</td>
-                    <td>35.9</td>
-                    <td>33.5</td>
-                    <td>10.1</td>
-                    <td>12.8</td>
+                    <td>LLaMA2 7B（稠密）</td>
+                    <td>6.7B</td>
+                    <td>6.7B</td>
+                    <td>2T tokens</td>
+                    <td>45.8</td>
+                    <td>33.9</td>
+                    <td>15.5</td>
+                    <td>14.6</td>
                 </tr>
             </tbody>
         </table>
 
-        <p>数据非常清晰：DeepSeekMoE 16B在MMLU上以44.2%领先GShard的39.8%（+4.4分），在GSM8K推理任务上更是翻倍领先（22.1% vs 9.7%）。而且请注意——DeepSeekMoE的活跃参数只有约2B，远低于GShard的约16B活跃参数！这意味DeepSeekMoE在计算效率上的优势更大。</p>
+        <p>数据非常清晰：在控制训练数据量（均为 2T tokens）的前提下，DeepSeekMoE 16B 只用约 40% 的计算量就与稠密的 DeepSeek 7B 比肩（论文 Table 3：MMLU 45.0 vs 48.2），并大幅超越同规模的 LLaMA2 7B（Table 4），尤其在代码与中文两项上优势明显。</p>
 
-        <p>特别值得注意的是在GSM8K（数学推理）上的表现差异。DeepSeekMoE以22.1%远超其他MoE方案的约9-10%——这意味着<strong>细粒度专家切分和共享专家设计对推理任务尤为有益</strong>。原因可能是：数学推理既需要"基础知识"（共享专家提供）又需要"策略知识"（不同路由专家提供不同解题策略），DeepSeekMoE的架构恰好契合了这个需求。</p>
+        <p>特别值得注意的是代码与中文能力：DeepSeekMoE 16B 在 HumanEval 上以 26.8% 远超 LLaMA2 7B 的 14.6%，在 CEval 上以 40.6% 超出 33.9%。论文将这一优势归因于“细粒度专家切分 + 共享专家”的设计——共享专家提供公共基础知识，细粒度路由专家负责差异化能力。需注意：在 MMLU 上 DeepSeekMoE 16B（45.0）略低于两个稠密对比模型（48.2 / 45.8），并非全面领先。</p>
 
         <div class="warning">
-            <strong>⚠️ 对比注意事项：</strong> 上表中的对比是基于 DeepSeekMoE 论文中公开的数据，虽然训练数据量（500B tokens）一致，但不同模型的数据质量、训练超参数、以及实验设置可能略有差异。不过，在控制变量的消融实验中（DeepSeekMoE vs 去掉共享专家的 DeepSeekMoE），共享专家带来的提升在统计上是显著的。而且，在后续 DeepSeek-V2 和 DeepSeek-V3 中，共享专家的设计被保留并进一步改进，这从侧面验证了其有效性。
+            <strong>⚠️ 对比注意事项：</strong> 上表数据取自 DeepSeekMoE 论文 Table 3（对比 DeepSeek 7B）与 Table 4（对比 LLaMA2 7B），两组对比都在相同的 2T tokens 语料上进行，是论文中最干净的同数据量对照。此外，论文 Table 1/2（约 2B 量级、100B tokens）显示，在同一激活参数量下 DeepSeekMoE 优于 GShard 与 Switch——这也是本章“专业化优势”说法的依据。
         </div>
 
         <h2>专家可视化：看到了什么？</h2>
@@ -382,7 +372,7 @@ def analyze_expert_specialization(model, tokenized_corpus):
                 <li>Dai 等，<em>DeepSeekMoE: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a></li>
                 <li>Lepikhin 等，<em>GShard</em>，2021。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a>（对比基线）</li>
             </ol>
-            <p>路由亲和度、激活专家数实验与专家可视化分析引自 DeepSeekMoE 论文及仓内 <code>pdfs/06_DeepSeekMoE_2024_Dai.pdf</code>。上文的 <math class="math-inline" aria-label="s 等于 W x 加 lambda sim"><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>W</mi><mi>i</mi></msub><mi>x</mi><mo>+</mo><mi>λ</mi><mo>·</mo><mi>sim</mi></math> 为<strong>教学解释式（非论文原式）</strong>；K 百分比与分簇标签为教学示意。</p>
+            <p>路由亲和度、激活专家数实验与专家可视化分析引自 DeepSeekMoE 论文及仓内 <code>pdfs/06_DeepSeekMoE_2024_Dai.pdf</code>；性能对比表数值取自论文 Table 3（DeepSeek 7B）与 Table 4（LLaMA2 7B）。上文的 <math class="math-inline" aria-label="s 等于 W x 加 lambda sim"><msub><mi>s</mi><mi>i</mi></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>W</mi><mi>i</mi></msub><mi>x</mi><mo>+</mo><mi>λ</mi><mo>·</mo><mi>sim</mi></math> 为<strong>教学解释式（非论文原式）</strong>；K 百分比与分簇标签为教学示意。</p>
         </section>
     </article>
     </main>
