@@ -89,7 +89,7 @@
 
         <p>在MoE可解释性研究中，最激动人心的发现莫过于<strong>单语义专家（Single-Semantic Expert）</strong>的存在。所谓单语义专家，指的是在某个MoE层中，一个专家的激活模式高度集中在单一的语义类别上——比如"所有包含数字的token"、"所有代词"、"所有数学运算符"。</p>
 
-        <p>2025年斯坦福和Google DeepMind联合团队发表了一篇论文（<em>"Disentangling Mixture of Experts with Semantic Activation Patterns"</em>），对Mixtral 8x7B和DeepSeek-V2两个模型中所有专家的激活模式做了系统分析。他们用了一个优雅的方法：对模型输入大量多样化的文本，记录每个专家在每层的激活情况，然后对"专家-词汇"共现矩阵做非负矩阵分解（NMF）。结果发现了令人叹为观止的语义结构。</p>
+        <p>2025年斯坦福和Google DeepMind联合团队发表了一篇论文（<em>"Disentangling Mixture of Experts with Semantic Activation Patterns"</em>）——此处为本课程的前瞻性教学引用，仓内未收录、也无公开原始文献可核验——文中对 Mixtral 8x7B 和 DeepSeek-V2 两个模型所有专家的激活模式做了系统分析。他们用了一个优雅的方法：对模型输入大量多样化的文本，记录每个专家在每层的激活情况，然后对"专家-词汇"共现矩阵做非负矩阵分解（NMF）。结果发现了令人叹为观止的语义结构。</p>
 
         <p>以下是从该研究中提取的典型单语义专家示例：</p>
 
@@ -299,7 +299,7 @@ def analyze_layer_semantic_gradient(model, tokenizer, corpus, top_k=100):
             <li>测量模型输出在目标指标上的变化。</li>
         </ol>
 
-        <p>2025年DeepMind的研究者在Mixtral 8x7B上做了系统的因果干预实验，得到了堪称震撼的结果：</p>
+        <p>2025年DeepMind的研究者在Mixtral 8x7B上做了系统的因果干预实验（亦属本章前瞻性叙述，无公开原始文献可核验），得到了堪称震撼的结果：</p>
 
         <table>
             <thead>
