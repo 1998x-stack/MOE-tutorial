@@ -114,7 +114,9 @@
             </tbody>
         </table>
 
-        <p>你能从中看出什么？DeepSeek-V3的活跃参数只有37B，和DBRX、Mixtral 8×22B处于同一量级，但MMLU得分88.5一举超越了Llama 3 405B这个Dense模型。这说明DeepSeek-V3的MoE架构对参数利用率达到了一个全新的高度。而它做到这一点的秘密武器，就是下面我们要深入解析的三个技术创新。</p>
+        <p>先说明口径：下表仅 <strong>DeepSeek-V3</strong> 一行取自 V3 技术报告；其余几行的参数量、训练成本与 MMLU 汇总自各方公开报道与模型卡，属于<strong>外部估算（教学整合）</strong>，与 V3 论文的实测口径不完全一致，仅用于展示数量级。</p>
+
+        <p>你能从中看出什么？DeepSeek-V3 的活跃参数只有 37B，与 DBRX、Mixtral 8×22B 处于同一量级，但论文报告的 MMLU 达 88.5，与更大的稠密模型处于同一水平。这说明 DeepSeek-V3 的 MoE 架构对参数利用率达到了一个全新的高度。而它做到这一点的秘密武器，就是下面我们要深入解析的三个技术创新。</p>
 
         <h2>移除辅助损失：为什么这是革命性的？</h2>
 
@@ -421,7 +423,7 @@ def fp8_linear_forward(x, weight, scale_x, scale_w):
                 <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a>（辅助损失）</li>
                 <li>DeepSeek-AI，<em>DeepSeek-V2</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a></li>
             </ol>
-            <p>「671B / 37B」「2.788M H800 GPU 小时」「$5.576M」引自 DeepSeek-V3 技术报告及仓内 <code>pdfs/08_DeepSeek-V3_2024_Liu.pdf</code>。图中控制环与 FP8 吞吐倍数（+40%）为<strong>教学示意/简化</strong>；bias 更新公式为与论文算法一致的<strong>教学形式</strong>。</p>
+            <p>「671B / 37B」「2.788M H800 GPU 小时」「$5.576M」「MMLU 88.5」引自 DeepSeek-V3 技术报告及仓内 <code>pdfs/08_DeepSeek-V3_2024_Liu.pdf</code>；对比表中非 DeepSeek-V3 行的参数量与成本为<strong>公开报道估算（教学整合）</strong>，非论文实测。图中控制环与 FP8 吞吐倍数（+40%）为<strong>教学示意/简化</strong>；bias 更新公式为与论文算法一致的<strong>教学形式</strong>。</p>
         </section>
     </article>
     </main>
