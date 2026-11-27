@@ -67,6 +67,10 @@
 
         <p>如果说2024年是MoE的"普及之年"（标志性事件：Mixtral开源、DeepSeek-V2发布），那么2025-2026年可以称为MoE的"进化之年"。这期间发生了一系列标志性事件：</p>
 
+        <div class="warning">
+            <strong>⚠️ 说明：</strong> 本节及本章后续关于 2025–2026 年的事件、模型名称与数字（如 Gemini 3 Ultra、Claude 4 Opus、"星瀚"、DeepSeek-V4、mHC、MoE Lens、MLPerf Mobile MoE 等）均为本课程的<strong>前瞻性教学推演</strong>，用于展示技术可能走向，<strong>并非已发生的公开事实</strong>，也没有可核验的原始论文或链接；请勿据此引用。
+        </div>
+
         <p>首先是2025年初，多个团队几乎同时发布了超过10万亿参数的MoE模型——这个规模在2024年还被认为是"疯狂的白板实验"。Google的Gemini 3 Ultra、Anthropic的Claude 4 Opus、以及一家中国团队的"星瀚"模型，总参数量都突破了10T大关，而活跃参数控制在200B-300B之间。这意味着，这些模型的"知识容量"相比2024年的模型提升了一个数量级，但推理成本仅增加了2-3倍。</p>
 
         <p>紧接着在2025年年中，DeepSeek-V4横空出世。DeepSeek-V4在延续V3的无损负载均衡范式基础上，将专家数量从V3的256个扩展到了1024个，并引入了一种称为"递归专家分解"的技术——每个专家内部不再是单一的FFN，而是一个小型MoE。没错，就是"MoE嵌套MoE"，有人把它称为"Inception MoE"。这个思路在理论上可以无限扩展参数容量，而计算复杂度只随嵌套层数线性增长。</p>
@@ -79,7 +83,7 @@
 
         <h2>mHC：后MoE时代的流形约束</h2>
 
-        <p><strong>mHC（manifold Hebbian Consolidation，流形赫布巩固）</strong>是2025年底由MIT和DeepMind联合团队提出的一种全新架构思路。它的目标不是"改进MoE"，而是"替代MoE"——用一种更优雅的方式来解决大规模模型中的稀疏计算问题。</p>
+        <p><strong>mHC（manifold Hebbian Consolidation，流形赫布巩固）</strong>是本课程对"后 MoE"方向的前瞻性设想：设想它由 MIT 与 DeepMind 一类团队在 2025 年底提出（教学推演，无原始论文可核验）。它的目标不是"改进MoE"，而是"替代MoE"——用一种更优雅的方式来解决大规模模型中的稀疏计算问题。</p>
 
         <p>mHC的核心思想是这样的：传统MoE通过一个显式的路由网络来决定哪些参数参与计算，这引入了一个离散的选择步骤，造成了路由不稳定性、负载均衡等一系列问题。mHC提出，为什么不把"参数选择"融入前向传播本身呢？具体来说，mHC在每一层都维护一个低维的"流形子空间"，输入token会沿着这个流形"流动"，与流形上的参数发生交互，交互强度由输入本身与流形方向的"对齐程度"决定——本质上这是一种连续的、可微的稀疏性。</p>
 
@@ -137,7 +141,7 @@
         <p>不过需要指出的是，mHC目前还处于非常早期的阶段。虽然在小规模实验（1B参数以下）中展示了有竞争力的结果，但在千亿参数级别的验证尚未完成。我个人的看法是：mHC代表了一种有趣的理论方向，但短期内不太可能取代成熟的MoE工程体系。更可能的路径是，mHC中的某些思想（如可微稀疏性、赫布学习规则）会被吸收进未来的MoE架构中，形成一种混合方案。</p>
 
         <div class="tip">
-            <strong>💡 学习建议：</strong> 如果你对 mHC 感兴趣，推荐阅读 2025 年 12 月发表在 NeurIPS 上的那篇原论文《Manifold Hebbian Consolidation: Towards Continuous Sparsity in Foundation Models》。同时关注 2026 年的后续工作，特别是关于如何将 mHC 扩展到 MoE-scale 的尝试。
+            <strong>💡 学习建议：</strong> mHC 是本课程的前瞻性设想，并非某篇已发表论文的原题，也没有 NeurIPS 出处可查。若想跟踪这条"从离散专家到连续稀疏"的线索，建议检索<strong>可微稀疏性（differentiable sparsity）</strong>、赫布式参数巩固与流形约束方向的公开工作，并关注它们能否被扩展到 MoE 规模。
         </div>
 
         <h2>MoE Lens与专家浓度发现</h2>
@@ -190,7 +194,7 @@
 
         <p>另一个2025-2026年非常火热的方向是<strong>MoE可解释性</strong>。虽然我们在第22章已经讨论过专家语义发现的基础工作，但2025年出现的<strong>MoE Lens</strong>框架将这个领域向前推进了一大步。</p>
 
-        <p>MoE Lens由Anthropic的interpretability团队提出（是的，就是那个做Claude可解释性研究的团队），它借用了一部分"机械可解释性"（Mechanistic Interpretability）的工具箱，专门用于分析MoE模型中的专家行为。它的核心发现是：<strong>专家的专业化程度远比我们想象的更加细粒度</strong>。</p>
+        <p>按本章的前瞻性叙述，<strong>MoE Lens</strong> 由 Anthropic 一类的可解释性研究团队提出（教学推演，无原始论文可核验），它借用了一部分"机械可解释性"（Mechanistic Interpretability）的工具箱，专门用于分析MoE模型中的专家行为。它的核心发现是：<strong>专家的专业化程度远比我们想象的更加细粒度</strong>。</p>
 
         <p>传统认知中，一个"代码专家"应该处理所有编程相关的token。但MoE Lens揭示的图景要复杂得多：在DeepSeek-V3级别的MoE模型中，几乎所有专家都同时处理多种不同的概念，没有一个专家是"纯"的。比如，某个专家可能同时负责Python语法中的"def"关键词和数学公式中的"积分符号"——这听起来很奇怪，但进一步分析发现，这两者在模型的高层表征中共享了一个共同特征："定义某种规则"。换句话说，专家的专业化是<strong>功能性的</strong>而非<strong>领域性的</strong>。</p>
 
