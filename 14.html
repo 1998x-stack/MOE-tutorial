@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
-    <meta name="description" content="长文本推理的瓶颈在 KV Cache。MLA 用低维隐向量把它压缩到 3% 量级，再配合三阶段的长上下文训练，把 MoE 推上 128K。">
+    <meta name="description" content="长文本推理的瓶颈在 KV Cache。MLA 用低维隐向量把它压缩到约 2% 量级，再配合三阶段的长上下文训练，把 MoE 推上 128K。">
     <title>第14章 DeepSeek-V2: MoE+长文本工业集大成</title>
     <link rel="stylesheet" href="theme.css">
     <style>
@@ -54,7 +54,7 @@
     <main class="main-content" id="content"><article>
         <header class="article-header">
             <h1>第14章 DeepSeek-V2：MoE + 长文本工业集大成</h1>
-            <p class="dek">长文本推理的瓶颈在 KV Cache。MLA 用低维隐向量把它压缩到 3% 量级，再配合三阶段的长上下文训练，把 MoE 推上 128K。</p>
+            <p class="dek">长文本推理的瓶颈在 KV Cache。MLA 用低维隐向量把它压缩到约 2% 量级，再配合三阶段的长上下文训练，把 MoE 推上 128K。</p>
         </header>
 
         <h2>DeepSeek-V2：MoE的长文本答卷</h2>
@@ -74,7 +74,7 @@
         <figure>
             <svg viewBox="0 0 860 330" role="img" aria-labelledby="fig-mla-title fig-mla-desc" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, 'PingFang SC', sans-serif">
                 <title id="fig-mla-title">标准 MHA 与 MLA 的 KV Cache 存储对比</title>
-                <desc id="fig-mla-desc">左图：MHA 对每个 token 直接缓存完整的 K 与 V，每 token 需 2×n_h×d_h 个元素。右图：MLA 先把 token 下投影为低维隐向量 c_t（每 token 只缓存 d_c 个元素），计算注意力时再上投影恢复 K、V。</desc>
+                <desc id="fig-mla-desc">左图：MHA 对每个 token 直接缓存完整的 K 与 V，每 token 需 2×n_h×d_h 个元素。右图：MLA 先把 token 下投影为低维隐向量 c_t，每 token 只需缓存 c_t 与解耦 RoPE 键，共 d_c + d_h^R 个元素，计算注意力时再上投影恢复 K、V。</desc>
                 <rect x="20" y="44" width="390" height="262" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
                 <rect x="440" y="44" width="400" height="262" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
                 <text x="215" y="32" font-size="14" font-weight="700" fill="#475569" text-anchor="middle">标准 MHA：直接缓存 K、V</text>
@@ -90,7 +90,7 @@
                 <path d="M221 164 V200" stroke="#94a3b8" stroke-width="1.6"/>
                 <rect x="60" y="200" width="320" height="56" rx="10" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
                 <text x="220" y="224" font-size="13" text-anchor="middle" fill="#7f1d1d" font-weight="700">KV Cache：2·n_h·d_h</text>
-                <text x="220" y="244" font-size="12" text-anchor="middle" fill="#991b1b">= 2 × 64 × 128 = 16384 元素/token</text>
+                <text x="220" y="244" font-size="12" text-anchor="middle" fill="#991b1b">= 2 × 128 × 128 = 32768 元素/token</text>
                 <rect x="465" y="96" width="80" height="44" rx="10" fill="#fff7ed" stroke="#d06d4d" stroke-width="2"/>
                 <text x="505" y="123" font-size="13" text-anchor="middle" fill="#7c2d12">h_t</text>
                 <path d="M547 118 h20" stroke="#94a3b8" stroke-width="1.6"/>
@@ -104,14 +104,14 @@
                 <text x="777" y="122" font-size="13" text-anchor="middle" fill="#0f4c4a">c_t (d_c)</text>
                 <path d="M777 144 V200" stroke="#147f80" stroke-width="1.6"/>
                 <rect x="520" y="200" width="300" height="56" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-                <text x="670" y="224" font-size="13" text-anchor="middle" fill="#14532d" font-weight="700">KV Cache：d_c</text>
-                <text x="670" y="244" font-size="12" text-anchor="middle" fill="#166534">= 512 元素/token（另一路恢复 K、V）</text>
-                <text x="20" y="322" font-size="12" fill="#475569">维度取 DeepSeek-V2 配置：n_h=64, d_h=128, d_c=512（教学示意）</text>
+                <text x="670" y="224" font-size="13" text-anchor="middle" fill="#14532d" font-weight="700">KV Cache：d_c + d_h^R</text>
+                <text x="670" y="244" font-size="12" text-anchor="middle" fill="#166534">= 512 + 64 = 576 元素/token</text>
+                <text x="20" y="322" font-size="12" fill="#475569">维度取 DeepSeek-V2 配置：n_h=128, d_h=128, d_c=512, d_h^R=64（引自论文表1/§3.1.2）</text>
             </svg>
-            <figcaption><span class="fig-num">图 1</span> MHA 直接缓存完整 K/V（每 token 16384 元素），MLA 只缓存低维隐向量 c_t（每 token 512 元素），注意力计算时再上投影恢复 K、V——压缩率正是 512/16384 ≈ 3.1%。</figcaption>
+            <figcaption><span class="fig-num">图 1</span> 同规模 MHA 直接缓存完整 K/V（每 token 2·n_h·d_h = 32768 元素），MLA 只缓存低维隐向量 c_t 与解耦 RoPE 键（每 token d_c + d_h^R = 576 元素），注意力计算时再上投影恢复 K、V——每 token 缓存量约为 MHA 的 1.8%（论文表 1：约等于仅 2.25 组的 GQA）。</figcaption>
         </figure>
 
-        <p>要理解MLA的伟大，首先要知道它解决了什么问题。在标准的Multi-Head Attention（MHA）中，每个注意力头有独立的Key和Value投影矩阵。当序列长度为L时，KV Cache需要存储L个位置的K和V矩阵，每个矩阵的大小为<code>n_heads × d_head</code>。对于DeepSeek-V2这样的模型（n_heads=64, d_head=128），单层KV Cache就是<code>L × 64 × 128 × 2 × 2</code>字节（FP16存储K和V）。当L=128K时，单层KV Cache就超过4GB——而模型有几十层！</p>
+        <p>要理解MLA的伟大，首先要知道它解决了什么问题。在标准的Multi-Head Attention（MHA）中，每个注意力头有独立的Key和Value投影矩阵。当序列长度为L时，KV Cache需要存储L个位置的K和V矩阵，每个矩阵的大小为<code>n_heads × d_head</code>。对于DeepSeek-V2这样的模型（n_heads=128, d_head=128），单层KV Cache就是<code>L × 128 × 128 × 2 × 2</code>字节（FP16存储K和V）。当L=128K时，单层KV Cache就超过8GB——而模型有60层！</p>
 
         <p>MLA的核心思想是：<strong>不直接存储K和V，而是将它们压缩到一个低维的隐空间（Latent Space）中</strong>。在推理时，KV Cache只存储这个低维的隐向量，在计算注意力时再从隐向量中恢复出K和V。这样一来，KV Cache的大小就从<code>n_heads × d_head</code>降到了<code>d_latent</code>（隐空间维度）。</p>
 
@@ -184,7 +184,7 @@ class MultiHeadLatentAttention(nn.Module):
         print(f"MLA KV Cache 压缩率: {ratio:.2%}")
         return self.d_latent</code></pre>
 
-        <p>在DeepSeek-V2的具体配置中：<code>n_heads=64, d_head=128, d_latent=512</code>。标准MHA的KV Cache每token需要<code>64×128×2=16384</code>个元素，而MLA只需<code>512</code>个元素——<strong>压缩率达到惊人的3.125%</strong>！也就是说，当处理128K上下文时，MLA的KV Cache只有标准MHA的1/32大小。</p>
+        <p>在DeepSeek-V2的具体配置中（论文 §3.1.2）：<code>n_heads=128, d_head=128, d_c=512</code>，另有一路解耦 RoPE 键 <code>d_h^R=64</code>。标准MHA的KV Cache每token需要<code>2×128×128=32768</code>个元素，而MLA每token只需缓存隐向量与RoPE键，即<code>d_c + d_h^R = 512+64 = 576</code>个元素——每token缓存量降到同规模MHA的<strong>约 1.8%（约 1/57）</strong>，论文表 1 将其比作“仅 2.25 组的 GQA”。论文摘要另报告：相对于其自有 67B 堆叠基线，MLA 把 KV Cache 减少 <strong>93.3%</strong>（两种口径不同，前者是单层每 token 元素数对比，后者是端到端部署对比）。</p>
 
         <table>
             <thead>
@@ -198,20 +198,20 @@ class MultiHeadLatentAttention(nn.Module):
             <tbody>
                 <tr>
                     <td>KV Cache 每token大小</td>
-                    <td>16384 元素</td>
-                    <td>512 元素</td>
-                    <td>32 倍压缩</td>
+                    <td>32768 元素</td>
+                    <td>576 元素</td>
+                    <td>约 57 倍压缩</td>
                 </tr>
                 <tr>
                     <td>128K 上下文 KV Cache</td>
-                    <td>~4.0 GB (单层)</td>
-                    <td>~0.125 GB (单层)</td>
-                    <td>32 倍压缩</td>
+                    <td>~8.0 GB (单层)</td>
+                    <td>~0.14 GB (单层)</td>
+                    <td>约 57 倍压缩</td>
                 </tr>
                 <tr>
-                    <td>各层总 KV Cache</td>
-                    <td>~200+ GB (不可接受)</td>
-                    <td>~6.25 GB</td>
+                    <td>60 层总 KV Cache</td>
+                    <td>~480 GB (不可接受)</td>
+                    <td>~9 GB</td>
                     <td>可接受</td>
                 </tr>
                 <tr>
@@ -229,11 +229,11 @@ class MultiHeadLatentAttention(nn.Module):
 
         <div class="math-equation" role="group" aria-label="MLA 的 KV Cache 压缩率公式">
             <div class="math-scroll" data-math-scroll="true" tabindex="0" role="region" aria-label="压缩率公式，可横向滚动">
-                <math display="block" aria-label="压缩率等于隐维度 d_c 除以 2 乘头数 n_h 乘每头维度 d_h">
+                <math display="block" aria-label="压缩率等于隐维度 d_c 加上解耦 RoPE 键维度 d_h^R，除以 2 乘头数 n_h 乘每头维度 d_h">
                     <mrow>
                         <mtext>压缩率</mtext><mo>=</mo>
                         <mfrac>
-                            <msub><mi>d</mi><mi>c</mi></msub>
+                            <mrow><msub><mi>d</mi><mi>c</mi></msub><mo>+</mo><msubsup><mi>d</mi><mi>h</mi><mi>R</mi></msubsup></mrow>
                             <mrow><mn>2</mn><mo>·</mo><msub><mi>n</mi><mi>h</mi></msub><mo>·</mo><msub><mi>d</mi><mi>h</mi></msub></mrow>
                         </mfrac>
                     </mrow>
@@ -241,10 +241,11 @@ class MultiHeadLatentAttention(nn.Module):
             </div>
         </div>
 
-        <p>将 <math class="math-inline" aria-label="n_h 等于 64"><msub><mi>n</mi><mi>h</mi></msub><mo>=</mo><mn>64</mn></math>、
+        <p>将 <math class="math-inline" aria-label="n_h 等于 128"><msub><mi>n</mi><mi>h</mi></msub><mo>=</mo><mn>128</mn></math>、
             <math class="math-inline" aria-label="d_h 等于 128"><msub><mi>d</mi><mi>h</mi></msub><mo>=</mo><mn>128</mn></math>、
-            <math class="math-inline" aria-label="d_c 等于 512"><msub><mi>d</mi><mi>c</mi></msub><mo>=</mo><mn>512</mn></math> 代入，即得约 3.1% 的压缩率。
-            （即长文本推理时 KV Cache 显存大致降为原来的三十分之一。）</p>
+            <math class="math-inline" aria-label="d_c 等于 512"><msub><mi>d</mi><mi>c</mi></msub><mo>=</mo><mn>512</mn></math>、
+            <math class="math-inline" aria-label="d_h^R 等于 64"><msubsup><mi>d</mi><mi>h</mi><mi>R</mi></msubsup><mo>=</mo><mn>64</mn></math> 代入，即得约 1.8% 的压缩率。
+            （即长文本推理时每 token 的 KV Cache 大致降为同规模 MHA 的五十七分之一。）</p>
 
         <h2>128K上下文训练全流程</h2>
 
@@ -301,27 +302,27 @@ training_mix = {
         </div>
 
         <div class="moe-widget" id="kv-demo">
-            <p class="widget-q"><strong>交互：</strong>按 DeepSeek-V2 配置（n_h=64, d_h=128, d_c=512, FP16），切换上下文长度 L，比较 MHA 与 MLA 的 KV Cache 显存。</p>
+            <p class="widget-q"><strong>交互：</strong>按 DeepSeek-V2 配置（n_h=128, d_h=128, d_c=512, d_h^R=64, FP16），切换上下文长度 L，比较单层 MHA 与 MLA 的 KV Cache 显存。</p>
             <div class="controls" role="group" aria-label="选择上下文长度">
                 <button type="button" data-l="4096" aria-pressed="false">L = 4K</button>
                 <button type="button" data-l="32768" aria-pressed="true">L = 32K</button>
                 <button type="button" data-l="131072" aria-pressed="false">L = 128K</button>
             </div>
-            <p class="widget-output" aria-live="polite">L=32768：MHA KV Cache ≈ 1.07 GB，MLA ≈ 33.6 MB，约为 3.1%。</p>
+            <p class="widget-output" aria-live="polite">L=32768：单层 MHA KV Cache ≈ 2.00 GB，MLA ≈ 36.0 MB，约为 1.8%。</p>
         </div>
         <script>
         (function () {
             var root = document.getElementById('kv-demo');
             if (!root) return;
             var out = root.querySelector('.widget-output');
-            var perMHA = 2 * 64 * 128 * 2;
-            var perMLA = 512 * 2;
+            var perMHA = 2 * 128 * 128 * 2;
+            var perMLA = (512 + 64) * 2;
             function fmt(bytes) {
                 var gb = bytes / 1024 / 1024 / 1024;
                 return gb >= 1 ? gb.toFixed(2) + ' GB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
             }
             function render(L) {
-                out.textContent = 'L=' + L + '：MHA KV Cache ≈ ' + fmt(L * perMHA) + '，MLA ≈ ' + fmt(L * perMLA) +
+                out.textContent = 'L=' + L + '：单层 MHA KV Cache ≈ ' + fmt(L * perMHA) + '，MLA ≈ ' + fmt(L * perMLA) +
                     '，约为 ' + (perMLA / perMHA * 100).toFixed(1) + '%。';
             }
             var btns = root.querySelectorAll('button');
@@ -394,7 +395,7 @@ training_mix = {
 
         <p>值得注意的是，DeepSeek-V2的活跃参数只有21B，不到LLaMA-3 70B的1/3，但在几乎所有benchmark上都领先。这验证了DeepSeekMoE论文的核心观点：<strong>MoE的参数效率和知识容量远高于稠密模型</strong>。</p>
 
-        <p>DeepSeek-V2在工程上的另一个亮点是其<strong>MoE架构的配置细节</strong>。它继承了DeepSeekMoE的共享专家设计（2个共享专家），但将路由专家从64个扩展到160个，Top-K从6增加到8。同时，每个路由专家的FFN中间维度进一步缩小（从1792降到约1152），使得专家更加"细粒度"。这种"更多专家、更小专家"的设计，让DeepSeek-V2在236B总参数下达到了前所未有的知识容量和专业化程度。</p>
+        <p>DeepSeek-V2在工程上的另一个亮点是其<strong>MoE架构的配置细节</strong>。它继承了DeepSeekMoE的共享专家设计（2个共享专家），但将路由专家从64个扩展到160个，Top-K 仍为 6（论文 §3.1.2：每个 token 激活 6 个路由专家）。同时，每个路由专家的 FFN 中间维度为 1536（比 DeepSeekMoE 更细粒度）。这种"更多专家、更小专家"的设计，让DeepSeek-V2在236B总参数下达到了前所未有的知识容量和专业化程度。</p>
 
         <div class="highlight">
             <strong>🔑 国产里程碑：</strong> DeepSeek-V2 发布时，国内 AI 社区的反应可以用"轰动"来形容。这是中国团队首次在大模型基座领域达到世界级水平，而且是选择了 MoE 这条"非主流"路线。DeepSeek 团队的贡献不仅仅是技术上的——他们证明了中国团队也能做出世界一流的基座模型，而且可以通过架构创新（而不是单纯堆算力）来缩小差距。在 DeepSeek-V2 之后，国内出现了多款 MoE 模型的跟进者，掀起了国产 MoE 的浪潮。
@@ -420,7 +421,7 @@ training_mix = {
                 <li>DeepSeek-AI，<em>DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model</em>，2024。<a href="https://arxiv.org/abs/2405.04434">arXiv:2405.04434</a>（MLA、MoE 配置、128K 训练）</li>
                 <li>DeepSeek-AI，<em>DeepSeekMoE</em>，2024。<a href="https://arxiv.org/abs/2401.06066">arXiv:2401.06066</a>（共享专家/细粒度路由）</li>
             </ol>
-            <p>MLA 的 KV Cache 压缩、维度配置（n_h=64, d_h=128, d_c=512）与三阶段长上下文训练流程引自 DeepSeek-V2 论文及仓内 <code>pdfs/07_DeepSeek-V2_2024_Liu.pdf</code>。图中/交互中的 KV Cache 显存 GB 数与「渐进式扩展」数据量为<strong>教学估算（已作简化）</strong>。</p>
+            <p>MLA 的 KV Cache 压缩、维度配置（n_h=128, d_h=128, d_c=512, d_h^R=64，论文 §3.1.2/表 1）与三阶段长上下文训练流程引自 DeepSeek-V2 论文及仓内 <code>pdfs/07_DeepSeek-V2_2024_Liu.pdf</code>；论文摘要报告的相对 67B 堆叠基线「KV Cache 减少 93.3%」与本文同规模 MHA 口径的「约 1.8%」不可混用。图中/交互中的 KV Cache 显存 GB 数与「渐进式扩展」数据量为<strong>教学估算（已作简化）</strong>。</p>
         </section>
     </article>
     </main>
