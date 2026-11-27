@@ -200,7 +200,7 @@
 
         <p>既然Decode阶段的核心问题是"专家加载开销太大"，那么一个自然的思路就是：<strong>能不能提前预测下一个token需要哪个专家，然后在当前token计算的同时，把下一个需要的专家预加载到高速缓存中？</strong>——这就是<strong>专家预取（Expert Prefetching）</strong>的核心思想。</p>
 
-        <p>YaliS（Yet Another LLM Inference System）是2025年由上海AI实验室开源的一个专注于MoE推理优化的框架。它的核心贡献之一就是提出了一个高效的<strong>预测性专家预取</strong>机制，让专家加载的延迟被"隐藏"在计算流水线中。</p>
+        <p>YaliS（Yet Another LLM Inference System）是本章用于讲解专家预取的前瞻性教学示例——设想 2025 年由上海 AI 实验室开源，无公开原始文献可核验。它的核心贡献之一就是提出了一个高效的<strong>预测性专家预取</strong>机制，让专家加载的延迟被"隐藏"在计算流水线中。</p>
 
         <p>YaliS的专家预取分为三个关键步骤：</p>
 

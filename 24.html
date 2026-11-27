@@ -133,7 +133,7 @@
             </tbody>
         </table>
 
-        <p>2025年Infini-LLM团队发表了一篇系统性的工作，专门研究MoE在消费级显卡上的推理部署。他们提出的<strong>分层卸载策略</strong>（Tiered Offloading）在RTX 4090上跑DeepSeek-V2的INT4版本，实现了相比纯GPU推理（显然装不下，只能做交换）4.4倍的速度提升。核心优化有三点：</p>
+        <p>2025年Infini-LLM团队发表了一篇系统性的工作，专门研究MoE在消费级显卡上的推理部署（Infini-LLM 为本章的前瞻性教学示例，无公开原始文献可核验）。他们提出的<strong>分层卸载策略</strong>（Tiered Offloading）在RTX 4090上跑DeepSeek-V2的INT4版本，实现了相比纯GPU推理（显然装不下，只能做交换）4.4倍的速度提升。核心优化有三点：</p>
 
         <ul>
             <li><strong>专家流行度感知缓存</strong>：不是所有专家被访问的频率都一样。Infini-LLM统计了在大量通用文本上MoE路由的分布，发现约30%的专家承担了70%的路由流量。把这些"高频专家"常驻GPU缓存，可以减少90%的CPU→GPU传输。</li>
@@ -228,7 +228,7 @@ async def ssd_moe_inference(prompt, model, ssd_path):
 
         yield output</code></pre>
 
-        <p>2026年初，一个名为<strong>MoE-Offload</strong>的开源项目实现了在RTX 4090 + 64GB内存 + 2TB NVMe SSD的配置上运行DeepSeek-V3 INT4的完整推理。他们报告的性能数据是：Prefill阶段（处理1024个token）约5秒，Decode阶段每token约0.5-1秒。虽然这个速度和A100上运行的几十ms/token没法比，但考虑到硬件成本只有后者的1/20，这个结果已经令人震惊。</p>
+        <p>2026年初，一个名为<strong>MoE-Offload</strong>的开源项目（前瞻性教学示例，无公开仓库可核验）实现了在RTX 4090 + 64GB内存 + 2TB NVMe SSD的配置上运行DeepSeek-V3 INT4的完整推理。他们报告的性能数据是：Prefill阶段（处理1024个token）约5秒，Decode阶段每token约0.5-1秒。虽然这个速度和A100上运行的几十ms/token没法比，但考虑到硬件成本只有后者的1/20，这个结果已经令人震惊。</p>
 
         <div class="highlight">
             <strong>🔑 关键洞察：</strong> SSD 流式加载的核心不在于"快"，而在于"够用"。MoE 的专家粒度天然适配 SSD 的随机读取优势。如果一个专家权重在 INT4 下为 0.5GB，NVMe SSD 的随机读取延迟约 10μs，读取这个专家的总时间 ≈ 寻址延迟 + 数据传输时间 = 10μs + 0.5GB/7GB/s = 约 80ms。这个数字和 GPU 一次 Attention 计算的开销（10-30ms）处于同一量级——通过异步流水线完全可以"吞掉"这部分延迟。关键在于不要让 CPU 内存成为瓶颈：SSD→CPU 和 CPU→GPU 两个传输必须同时进行，而不是串行化。
