@@ -273,64 +273,58 @@ def switch_forward(x, experts, router):
 
         <p>Switch Transformer最令人震撼的成就是：它成功训练了一个<strong>1.6万亿参数</strong>的模型（Switch-C）。这个规模在当时是空前的——即使放在今天，万亿参数模型也是极少数团队能够触及的领域。</p>
 
-        <p>让我们看看他们是怎么做到的。Switch Transformer是在Google的TPU v3集群上训练的，使用了<strong>2048个TPU核心</strong>。关键配置如下：</p>
+        <p>让我们看看他们是怎么做到的。Switch Transformer 在 Google 的 TPUv3 集群上训练（论文的小规模实验使用 32 个 TPUv3 核心）。下表给出论文 Table 9 中三个 Switch 变体的关键配置：</p>
 
         <table>
             <thead>
                 <tr>
                     <th>配置项</th>
-                    <th>Switch-C (1.6T)</th>
-                    <th>Switch-XXL (395B)</th>
-                    <th>Switch-Base (83B)</th>
+                    <th>Switch-Base</th>
+                    <th>Switch-XXL</th>
+                    <th>Switch-C</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>总参数量</td>
-                    <td>1.6T</td>
+                    <td>7B</td>
                     <td>395B</td>
-                    <td>83B</td>
+                    <td>1571B</td>
                 </tr>
                 <tr>
-                    <td>活跃参数</td>
-                    <td>~6.2B</td>
-                    <td>~3.7B</td>
-                    <td>~1.7B</td>
+                    <td>层数</td>
+                    <td>12</td>
+                    <td>24</td>
+                    <td>15</td>
                 </tr>
                 <tr>
                     <td>专家数量</td>
-                    <td>2048</td>
-                    <td>256</td>
+                    <td>128</td>
                     <td>64</td>
+                    <td>2048</td>
                 </tr>
                 <tr>
-                    <td>Top-1 路由</td>
-                    <td>是</td>
-                    <td>是</td>
-                    <td>是</td>
+                    <td>专家激活频率</td>
+                    <td>1/2</td>
+                    <td>1/2</td>
+                    <td>1</td>
                 </tr>
                 <tr>
-                    <td>Capacity Factor</td>
-                    <td>1.25</td>
-                    <td>1.25</td>
-                    <td>1.25</td>
+                    <td>FLOPs/seq</td>
+                    <td>124B</td>
+                    <td>6.3T</td>
+                    <td>890B</td>
                 </tr>
                 <tr>
-                    <td>训练语料</td>
-                    <td>C4 (800GB)</td>
-                    <td>C4</td>
-                    <td>C4</td>
-                </tr>
-                <tr>
-                    <td>硬件</td>
-                    <td>2048 TPUv3</td>
-                    <td>512 TPUv3</td>
-                    <td>128 TPUv3</td>
+                    <td>C4 负对数困惑度 @500k</td>
+                    <td>-1.306</td>
+                    <td>-1.008</td>
+                    <td>-1.043</td>
                 </tr>
             </tbody>
         </table>
 
-        <p>一个特别值得注意的细节是：Switch-C总共1.6T参数，但每个token只激活约6.2B参数——<strong>激活率不到0.4%</strong>！相比之下，稠密T5-XXL只有11B参数，但100%都被激活。Switch-C的总参数是T5-XXL的145倍，但计算量仅为其约56%。这就是稀疏MoE的魔力。</p>
+        <p>一个特别值得注意的细节是：Switch-C 总参数高达 1571B，但只有 15 层、每 token 只激活 1 个专家（共 2048 个），其 FLOPs/seq 仅 890B，约为 T5-XXL（6.3T）的 <strong>14%</strong>；总参数却是 T5-XXL（11B）的约 143 倍。在 C4 语料上，Switch-C 于 500k 步的负对数困惑度（越大越好）达 -1.043，优于 T5-XXL 的 -1.095。这就是稀疏 MoE 的魔力：用极小的计算量换来巨大的参数容量。</p>
 
         <p>Switch Transformer在训练中还引入了一项重要改进：<strong>流水线并行（Pipeline Parallelism）</strong>。与Sparsely-Gated MoE的数据并行+模型并行不同，Switch Transformer将不同的Transformer层分配到不同的设备上，形成流水线。MoE层中的2048个专家分布在所有TPU核心上，每个核心负责一小部分专家。当token被路由到其他核心上的专家时，通过all-to-all通信传输数据。</p>
 
@@ -347,9 +341,9 @@ TPU 3:  专家 [384-511] +  Layer 2 Attention  +  Layer 2 MoE(部分)
 # Step 2: Layer 1 MoE All-to-All 通信，TPU 2/3 开始 Layer 2 Attention
 # Step 3: 流水线填满，所有核心全速运行</code></pre>
 
-        <p>这个设计的精妙之处在于：MoE层的通信可以和Attention层的计算重叠，最大限度减少通信等待时间。Switch Transformer报告的训练效率达到了惊人的<strong>86%的模型并行利用率</strong>——在2048个TPU上，这个数字是非常优秀的。</p>
+        <p>这个设计的精妙之处在于：MoE层的通信可以和Attention层的计算重叠，最大限度减少通信等待时间。论文报告，在相同算力预算下，Switch-C 达到固定困惑度所需的步数比 T5-XXL 少约 4 倍；论文也强调，更大的 Switch-C（1.6T/2048 专家）反而没有出现训练不稳定。</p>
 
-        <p>最终的结果令人振奋：Switch-C在C4语料上的perplexity达到了9.56，远超同计算预算的T5-XXL（11.33）。在SuperGLUE等NLU benchmark上，Switch Transformer也取得了当时最优的成绩。更重要的是，<strong>这篇论文彻底打消了工业界对"MoE能否训到万亿参数"的疑虑</strong>——从此以后，万亿参数不再是一个幻想。</p>
+        <p>最终的结果令人振奋：在 C4 语料上，Switch-C 于 500k 步的负对数困惑度达到 -1.043，优于同规模计算预算下的 T5-XXL（-1.095）。在 SuperGLUE 等 NLU benchmark 上，Switch Transformer 也取得了很强的成绩。更重要的是，<strong>这篇论文彻底打消了工业界对“MoE能否训到万亿参数”的疑虑</strong>——从此以后，万亿参数不再是一个幻想。</p>
 
         <div class="highlight">
             <strong>🔑 关键启示：</strong> Switch Transformer 告诉我们一个深刻的工程哲理：有时候，"放弃"才是更好的策略。放弃 Top-2 改用 Top-1，放弃了理论上的表达能力上限，换来了实际训练中的稳定和高效。在 AI 工程中，理论最优和实际最优往往是两回事。Switch Transformer 的选择为后续所有 MoE 工作树立了一个榜样：做务实的简化，而不是追求理论上的完美。
@@ -370,7 +364,7 @@ TPU 3:  专家 [384-511] +  Layer 2 Attention  +  Layer 2 MoE(部分)
                 <li>Shazeer 等，<em>Outrageously Large Neural Networks</em>，2017。<a href="https://arxiv.org/abs/1701.06538">arXiv:1701.06538</a></li>
                 <li>Lepikhin 等，<em>GShard</em>，2020。<a href="https://arxiv.org/abs/2006.16668">arXiv:2006.16668</a></li>
             </ol>
-            <p>「Switch-C 1.6T 总参 / 2048 TPUv3 / 86% 并行利用率」及 Switch-XXL、Switch-Base 配置引自 Switch Transformer 论文及仓内 <code>pdfs/04_Switch_Transformer_2021_Fedus.pdf</code>；capacity factor–drop 率对照表与数值区间为<strong>教学经验总结（示意）</strong>，具体 drop 率随任务与路由分布而异。</p>
+            <p>本节参数与 FLOPs 配置（Switch-Base 7B/128 专家、Switch-XXL 395B/64 专家、Switch-C 1571B/2048 专家、FLOPs/seq 与 C4 负对数困惑度）均取自 Switch Transformer 论文 Table 9 及仓内 <code>pdfs/04_Switch_Transformer_2021_Fedus.pdf</code>；capacity factor–drop 率对照表与数值区间为<strong>教学经验总结（示意）</strong>，具体 drop 率随任务与路由分布而异。</p>
         </section>
     </article>
     </main>
